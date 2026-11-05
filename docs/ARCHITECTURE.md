@@ -63,19 +63,23 @@ Only an administrator can change the mode, and only while the room is empty. Thi
 
 ### Volcengine WTN path
 
-WTN rooms publish screen and voice as separate streams:
+WTN rooms publish screen preview, screen HD and voice as three independent streams:
 
 ```text
-screen: <room>_<user>_screen
-voice:  <room>_<user>_voice
+screen preview: <room>_<user>_screen_preview_<unique>
+screen HD:      <room>_<user>_screen_hd_<unique>
+voice:          <room>_<user>_voice_<unique>
 ```
 
-The publishing browser creates one WHIP-style `RTCPeerConnection` with simulcast encodings. Viewers create independent WHEP-style subscriptions and select the `low` or `high` RID. The existing poster remains visible while a subscription is being established.
+The publishing browser creates two WHIP-style `RTCPeerConnection` instances for the screen: a preview stream at roughly 360p / 15 FPS / 300 Kbps and an HD stream using the room's configured resolution, frame rate and bitrate. Preview does not depend on simulcast RIDs, so the WTN application does not need to expose RID switching. Viewers suspend their preview subscription when idle, open the preview subscription on hover, and replace it with an independent HD subscription after a click. The poster remains visible while a subscription is being established.
+
+The second stream adds roughly 300 Kbps to the sharer's upload, but makes preview and HD deterministic by using separate StreamIDs instead of a per-stream layer selector. Screen system audio is published with the HD stream only; microphone voice remains a separate voice stream.
 
 The Fastify server:
 
 - validates the user's room and media mode;
-- validates that a screen or voice stream is active before issuing a subscription resource;
+- records the latest preview, HD and voice StreamID independently;
+- validates that the requested screen quality or voice stream is active before issuing a subscription resource;
 - creates protocol-safe stream IDs;
 - signs short-lived HS256 WTN JWTs;
 - returns only the WTN URL and token to the browser.

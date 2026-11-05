@@ -26,10 +26,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 - Deferred P2P `setParameters()` until negotiation completes.
 - Removed unsupported WTN `sendEncodings.priority` fields for Chromium compatibility.
-- Used WTN-compatible `Low`/`High` RID values and added a no-RID subscription fallback.
-- Stopped RID retry loops when a WTN application falls back to a single default layer.
+- Replaced WTN RID switching with independently published and subscribed `preview` and `hd` streams.
+- Kept the active preview stream when an HD switch fails, avoiding playback interruption and retry-loop crashes.
 - Generated a unique WTN publish StreamID for every share attempt and blocked duplicate start clicks.
-- Changed no-RID WTN fallback into a silent compatibility mode instead of an interrupting toast.
+- Removed the misleading WTN RID compatibility notice; quality badges now reflect the actual subscription.
 - Made full error details visible, selectable and copyable above every room control.
 
 ### Security

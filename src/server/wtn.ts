@@ -3,6 +3,7 @@ import type {
   RoomId,
   WtnMediaKind,
   WtnPublishResource,
+  WtnStreamQuality,
   WtnSubscribeResource,
 } from "../shared/types.js";
 
@@ -23,7 +24,7 @@ interface WtnResourceInput {
   roomId: RoomId;
   ownerId: string;
   clientId: string;
-  rid?: "low" | "high";
+  quality?: WtnStreamQuality;
   streamId?: string;
 }
 
@@ -35,19 +36,22 @@ export function createWtnStreamId(
   roomId: RoomId,
   ownerId: string,
   kind: WtnMediaKind,
+  quality?: WtnStreamQuality,
 ): string {
   const roomPart = roomId.replace(/[^a-zA-Z0-9]/g, "");
   const ownerPart = ownerId.replace(/[^a-zA-Z0-9]/g, "");
   const kindPart = kind === "screen" ? "screen" : "voice";
-  return `${roomPart}_${ownerPart}_${kindPart}`.slice(0, 64);
+  const qualityPart = kind === "screen" && quality ? `_${quality}` : "";
+  return `${roomPart}_${ownerPart}_${kindPart}${qualityPart}`.slice(0, 64);
 }
 
 export function createWtnPublishStreamId(
   roomId: RoomId,
   ownerId: string,
   kind: WtnMediaKind,
+  quality?: WtnStreamQuality,
 ): string {
-  const base = createWtnStreamId(roomId, ownerId, kind);
+  const base = createWtnStreamId(roomId, ownerId, kind, quality);
   const suffix = randomBytes(4).toString("hex");
   return `${base.slice(0, 55)}_${suffix}`;
 }
@@ -79,7 +83,13 @@ export function createWtnResource(
   input: WtnResourceInput,
 ): WtnPublishResource | WtnSubscribeResource {
   const streamId =
-    input.streamId ?? createWtnStreamId(input.roomId, input.ownerId, input.kind);
+    input.streamId ??
+    createWtnStreamId(
+      input.roomId,
+      input.ownerId,
+      input.kind,
+      input.quality,
+    );
   const url = new URL(
     `${input.config.apiBaseUrl.replace(/\/$/, "")}/${input.action}/${encodeURIComponent(
       input.config.appId,
@@ -97,10 +107,22 @@ export function createWtnResource(
   });
 
   if (input.action === "pub") {
-    return { url: url.toString(), token, streamId };
+    return {
+      url: url.toString(),
+      token,
+      streamId,
+      ...(input.kind === "screen"
+        ? { quality: input.quality ?? "hd" }
+        : {}),
+    };
   }
 
-  const rid = input.rid ?? "low";
-  url.searchParams.set("RID", rid === "high" ? "High" : "Low");
-  return { url: url.toString(), token, streamId, rid };
+  return {
+    url: url.toString(),
+    token,
+    streamId,
+    ...(input.kind === "screen"
+      ? { quality: input.quality ?? "hd" }
+      : {}),
+  };
 }

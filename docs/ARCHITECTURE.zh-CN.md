@@ -63,19 +63,23 @@ C 向 A 和 B 发送屏幕与语音
 
 ### 火山 WTN 路径
 
-WTN 房间把屏幕和语音发布为独立媒体流：
+WTN 房间把屏幕预览、屏幕高清和语音发布为三个独立媒体流：
 
 ```text
-屏幕：<room>_<user>_screen
-语音：<room>_<user>_voice
+屏幕预览：<room>_<user>_screen_preview_<unique>
+屏幕高清：<room>_<user>_screen_hd_<unique>
+语音：    <room>_<user>_voice_<unique>
 ```
 
-发布端创建一个 WHIP 风格的 `RTCPeerConnection`，视频使用 Simulcast。观看者为每个发布者创建独立 WHEP 订阅，并选择 `low` 或 `high` RID。订阅建立期间继续显示现有首帧。
+发布端为屏幕创建两个 WHIP 风格的 `RTCPeerConnection`：预览流约 360p / 15 FPS / 300 Kbps，高清流使用房间设置的分辨率、帧率和码率。预览流不依赖 Simulcast RID，因此不要求 WTN 应用支持 RID。观看者创建独立 WHEP 订阅：悬浮订阅预览流，点击后新建高清订阅并替换预览，切换期间继续显示首帧。
+
+双流方案会让共享者额外上传约 300 Kbps 的预览流，但可以把“预览”和“高清”做成确定可切换的两条 StreamID，不受 WTN 单流层级能力影响。屏幕系统声音只随高清流发布；麦克风语音仍使用独立的单条语音流。
 
 Fastify 服务端负责：
 
 - 验证用户所在房间和媒体模式；
-- 签发订阅资源前验证屏幕或语音流已经发布；
+- 按屏幕预览、屏幕高清和语音分别登记最新 StreamID；
+- 签发订阅资源前验证目标画质或语音流已经发布；
 - 生成符合协议要求的 StreamID；
 - 签发短期 HS256 WTN JWT；
 - 只向浏览器返回 WTN URL 和 Token。

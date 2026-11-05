@@ -10,6 +10,7 @@ import type {
   RtcIceServer,
   ServerEvent,
   ShareSettings,
+  WtnStreamQuality,
 } from "../shared/types";
 import { api, CLIENT_ID } from "./api";
 import {
@@ -45,6 +46,11 @@ interface VoiceOutgoingPeer {
 interface VoiceIncomingPeer {
   pc: RTCPeerConnection;
   stream: MediaStream;
+}
+
+interface WtnScreenSubscriptionState {
+  quality: WtnStreamQuality;
+  subscription: WtnSubscription;
 }
 
 export interface VoiceInputDevice {
@@ -256,16 +262,23 @@ export function useRoomSession(
     new Map<string, RTCIceCandidateInit[]>(),
   );
   const voiceOutgoingRetryTimersRef = useRef(new Map<string, number>());
-  const wtnScreenPublisherRef = useRef<WtnPublisher | null>(null);
+  const wtnScreenPublishersRef = useRef<
+    Partial<Record<WtnStreamQuality, WtnPublisher>>
+  >({});
+  const wtnScreenPublishGenerationRef = useRef(0);
+  const wtnScreenPublishQueueRef = useRef<Promise<void>>(Promise.resolve());
   const wtnVoicePublisherRef = useRef<WtnPublisher | null>(null);
   const wtnScreenSubscriptionsRef = useRef(
-    new Map<string, WtnSubscription>(),
+    new Map<string, WtnScreenSubscriptionState>(),
   );
   const wtnVoiceSubscriptionsRef = useRef(
     new Map<string, WtnSubscription>(),
   );
   const wtnScreenDesiredRef = useRef(new Map<string, QualityLevel>());
   const wtnScreenTasksRef = useRef(new Map<string, Promise<void>>());
+  const requestWtnScreenQualityRef = useRef<
+    (ownerId: string, quality: QualityLevel) => void
+  >(() => undefined);
   const wtnVoiceTasksRef = useRef(new Map<string, Promise<void>>());
   const reconnectTimerRef = useRef<number | null>(null);
   const stopShareRef = useRef<() => void>(() => undefined);
@@ -294,6 +307,53 @@ export function useRoomSession(
   const send = useCallback((event: ClientEvent) => {
     const socket = socketRef.current;
     if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(event));
+  }, []);
+
+  const publishWtnScreenStreams = useCallback(
+    async (stream: MediaStream, nextSettings: ShareSettings) => {
+      const [previewResource, hdResource] = await Promise.all([
+        api.wtnPublish("screen", "preview"),
+        api.wtnPublish("screen", "hd"),
+      ]);
+      let preview: WtnPublisher | null = null;
+      let hd: WtnPublisher | null = null;
+      try {
+        preview = await publishToWtn(
+          stream,
+          "screen",
+          "preview",
+          nextSettings,
+          previewResource,
+        );
+        hd = await publishToWtn(
+          stream,
+          "screen",
+          "hd",
+          nextSettings,
+          hdResource,
+        );
+        return { preview, hd };
+      } catch (error) {
+        await Promise.allSettled(
+          [preview, hd]
+            .filter((publisher): publisher is WtnPublisher => Boolean(publisher))
+            .map((publisher) => publisher.close()),
+        );
+        throw error;
+      }
+    },
+    [],
+  );
+
+  const closeWtnScreenPublishers = useCallback(async () => {
+    wtnScreenPublishGenerationRef.current += 1;
+    const publishers = wtnScreenPublishersRef.current;
+    wtnScreenPublishersRef.current = {};
+    await Promise.allSettled(
+      Object.values(publishers)
+        .filter((publisher): publisher is WtnPublisher => Boolean(publisher))
+        .map((publisher) => publisher.close()),
+    );
   }, []);
 
   const refreshVoiceInputDevices = useCallback(async () => {
@@ -497,10 +557,10 @@ export function useRoomSession(
 
   const closeWtnScreenSubscription = useCallback(
     (ownerId: string, clearMedia = true) => {
-      const subscription = wtnScreenSubscriptionsRef.current.get(ownerId);
+      const state = wtnScreenSubscriptionsRef.current.get(ownerId);
       wtnScreenSubscriptionsRef.current.delete(ownerId);
       wtnScreenDesiredRef.current.delete(ownerId);
-      if (subscription) void subscription.close();
+      if (state) void state.subscription.close();
       if (clearMedia) {
         setRemoteStreams((current) => {
           const next = { ...current };
@@ -546,87 +606,92 @@ export function useRoomSession(
       if (wtnScreenTasksRef.current.has(ownerId)) return;
 
       const task = (async () => {
-        for (let attempt = 0; attempt < 2; attempt += 1) {
+        while (true) {
           const desired = wtnScreenDesiredRef.current.get(ownerId);
           if (!desired) return;
-          let subscription = wtnScreenSubscriptionsRef.current.get(ownerId);
-          if (!subscription) {
-            const resource = await api.wtnSubscribe(
-              ownerId,
-              "screen",
-              desired === "hd" ? "high" : "low",
+          const targetQuality: WtnStreamQuality =
+            desired === "hd" ? "hd" : "preview";
+          const active = wtnScreenSubscriptionsRef.current.get(ownerId);
+          if (active?.quality === targetQuality) {
+            setConfirmedQuality((current) =>
+              current[ownerId] === desired
+                ? current
+                : { ...current, [ownerId]: desired },
             );
-            if (wtnScreenDesiredRef.current.get(ownerId) === undefined) return;
-            subscription = await subscribeToWtn("screen", resource);
-            if (wtnScreenDesiredRef.current.get(ownerId) === undefined) {
-              await subscription.close();
-              return;
-            }
-            wtnScreenSubscriptionsRef.current.set(ownerId, subscription);
-            const createdStream = subscription.stream;
-            setRemoteStreams((current) => ({
-              ...current,
-              [ownerId]: createdStream,
-            }));
+            return;
           }
-          if (!subscription) return;
-          const activeSubscription = subscription;
+
+          const resource = await api.wtnSubscribe(
+            ownerId,
+            "screen",
+            targetQuality,
+          );
+          if (!wtnScreenDesiredRef.current.has(ownerId)) return;
+          const nextSubscription = await subscribeToWtn("screen", resource);
+          if (!wtnScreenDesiredRef.current.has(ownerId)) {
+            await nextSubscription.close();
+            return;
+          }
+
+          const previous =
+            wtnScreenSubscriptionsRef.current.get(ownerId)?.subscription;
+          wtnScreenSubscriptionsRef.current.set(ownerId, {
+            quality: nextSubscription.quality,
+            subscription: nextSubscription,
+          });
+          setRemoteStreams((current) => ({
+            ...current,
+            [ownerId]: nextSubscription.stream,
+          }));
+          if (previous) void previous.close();
 
           const latest = wtnScreenDesiredRef.current.get(ownerId);
-          if (!latest) {
-            closeWtnScreenSubscription(ownerId);
+          if (latest === desired) {
+            setConfirmedQuality((current) => ({
+              ...current,
+              [ownerId]: desired,
+            }));
             return;
           }
-          if (!activeSubscription.supportsRid) {
-            setConfirmedQuality((current) =>
-              current[ownerId] === "hd"
-                ? current
-                : { ...current, [ownerId]: "hd" },
-            );
-            return;
-          }
-          const latestRid = latest === "hd" ? "high" : "low";
-          if (activeSubscription.rid !== latestRid) {
-            try {
-              await activeSubscription.updateRid(latestRid);
-              activeSubscription.rid = latestRid;
-            } catch {
-              closeWtnScreenSubscription(ownerId);
-              wtnScreenDesiredRef.current.set(ownerId, latest);
-              continue;
-            }
-          }
-          setConfirmedQuality((current) => ({
-            ...current,
-            [ownerId]: latest,
-          }));
-          if (wtnScreenDesiredRef.current.get(ownerId) === latest) return;
         }
-        throw new Error("火山 WTN 画质切换失败，请稍后重试");
       })()
         .catch((error) => {
-          closeWtnScreenSubscription(ownerId);
+          if (!wtnScreenDesiredRef.current.has(ownerId)) return;
+          const active = wtnScreenSubscriptionsRef.current.get(ownerId);
+          if (active) {
+            wtnScreenDesiredRef.current.set(
+              ownerId,
+              active.quality === "hd" ? "hd" : "low",
+            );
+          } else {
+            wtnScreenDesiredRef.current.delete(ownerId);
+          }
+          const fallback = active
+            ? active.quality === "hd"
+              ? "已继续使用高清流"
+              : "已继续使用轻量预览"
+            : "请稍后重试";
           setNotice(
-            error instanceof Error ? error.message : "火山 WTN 订阅失败",
+            `${
+              error instanceof Error ? error.message : "火山 WTN 订阅失败"
+            }，${fallback}`,
           );
         })
         .finally(() => {
           wtnScreenTasksRef.current.delete(ownerId);
-          const latest = wtnScreenDesiredRef.current.get(ownerId);
-          const subscription = wtnScreenSubscriptionsRef.current.get(ownerId);
-          const latestRid = latest === "hd" ? "high" : "low";
-          if (
-            latest &&
-            subscription?.supportsRid &&
-            subscription.rid !== latestRid
-          ) {
-            requestWtnScreenQuality(ownerId, latest);
+          const desired = wtnScreenDesiredRef.current.get(ownerId);
+          const active = wtnScreenSubscriptionsRef.current.get(ownerId);
+          const desiredQuality: WtnStreamQuality =
+            desired === "hd" ? "hd" : "preview";
+          if (desired && active?.quality !== desiredQuality) {
+            requestWtnScreenQualityRef.current(ownerId, desired);
           }
         });
       wtnScreenTasksRef.current.set(ownerId, task);
     },
-    [closeWtnScreenSubscription],
+    [],
   );
+  requestWtnScreenQualityRef.current = requestWtnScreenQuality;
 
   const ensureWtnVoiceSubscription = useCallback(
     (ownerId: string) => {
@@ -639,7 +704,7 @@ export function useRoomSession(
         return;
       }
       const task = (async () => {
-        const resource = await api.wtnSubscribe(ownerId, "voice", "low");
+        const resource = await api.wtnSubscribe(ownerId, "voice");
         if (
           !voiceEnabledRef.current ||
           !remoteVoiceEnabledRef.current.has(ownerId)
@@ -1247,6 +1312,13 @@ export function useRoomSession(
               ? { ...current, [event.userId]: { ...share, settings: event.settings } }
               : current;
           });
+          if (mediaMode === "wtn" && event.userId !== user.id) {
+            const desired = wtnScreenDesiredRef.current.get(event.userId);
+            if (desired) {
+              closeWtnScreenSubscription(event.userId);
+              requestWtnScreenQuality(event.userId, desired);
+            }
+          }
           break;
         case "voice.updated":
           if (event.enabled) {
@@ -1455,6 +1527,7 @@ export function useRoomSession(
       handleIncomingVoiceOffer,
       loadMessages,
       mediaMode,
+      requestWtnScreenQuality,
       send,
       syncVoicePeers,
       user.id,
@@ -1549,15 +1622,19 @@ export function useRoomSession(
       const micStream = micStreamRef.current;
       micStreamRef.current = null;
       if (micStream) for (const track of micStream.getTracks()) track.stop();
-      const screenPublisher = wtnScreenPublisherRef.current;
       const voicePublisher = wtnVoicePublisherRef.current;
-      wtnScreenPublisherRef.current = null;
       wtnVoicePublisherRef.current = null;
-      if (screenPublisher) void screenPublisher.close();
+      void closeWtnScreenPublishers();
       if (voicePublisher) void voicePublisher.close();
       closeVoiceAudioContext();
     };
-  }, [closePeerMaps, closeVoiceAudioContext, handleServerEvent, roomId]);
+  }, [
+    closePeerMaps,
+    closeVoiceAudioContext,
+    closeWtnScreenPublishers,
+    handleServerEvent,
+    roomId,
+  ]);
 
   const startShare = useCallback(async () => {
     if (shareStartingRef.current) return;
@@ -1594,12 +1671,10 @@ export function useRoomSession(
         .catch(() => undefined);
       const poster = await capturePoster(stream);
       if (mediaMode === "wtn") {
-        const resource = await api.wtnPublish("screen");
-        wtnScreenPublisherRef.current = await publishToWtn(
+        await wtnScreenPublishQueueRef.current;
+        wtnScreenPublishersRef.current = await publishWtnScreenStreams(
           stream,
-          "screen",
           settingsRef.current,
-          resource,
         );
       }
       localStreamRef.current = stream;
@@ -1631,15 +1706,13 @@ export function useRoomSession(
       shareStartingRef.current = false;
       setShareStarting(false);
     }
-  }, [createOutgoingPeer, mediaMode, send, user.id]);
+  }, [createOutgoingPeer, mediaMode, publishWtnScreenStreams, send, user.id]);
 
   const stopShare = useCallback(() => {
     send({ type: "share.stopped" });
     for (const { pc } of outgoingRef.current.values()) pc.close();
     outgoingRef.current.clear();
-    const wtnPublisher = wtnScreenPublisherRef.current;
-    wtnScreenPublisherRef.current = null;
-    if (wtnPublisher) void wtnPublisher.close();
+    void closeWtnScreenPublishers();
     const stream = localStreamRef.current;
     if (stream) for (const track of stream.getTracks()) track.stop();
     localStreamRef.current = null;
@@ -1650,7 +1723,7 @@ export function useRoomSession(
         participant.id === user.id ? { ...participant, isSharing: false } : participant,
       ),
     );
-  }, [send, user.id]);
+  }, [closeWtnScreenPublishers, send, user.id]);
   useEffect(() => {
     stopShareRef.current = stopShare;
   }, [stopShare]);
@@ -1670,25 +1743,52 @@ export function useRoomSession(
           })
           .catch(() => undefined);
       }
-      send({ type: "share.updated", settings: next });
       if (mediaMode === "wtn") {
-        const previousPublisher = wtnScreenPublisherRef.current;
-        wtnScreenPublisherRef.current = null;
-        if (previousPublisher) await previousPublisher.close();
-        const resource = await api.wtnPublish("screen");
-        wtnScreenPublisherRef.current = await publishToWtn(
-          stream,
-          "screen",
-          next,
-          resource,
-        );
+        const generation = ++wtnScreenPublishGenerationRef.current;
+        const task = wtnScreenPublishQueueRef.current.then(async () => {
+          if (generation !== wtnScreenPublishGenerationRef.current) return;
+          try {
+            const previous = wtnScreenPublishersRef.current;
+            const publishers = await publishWtnScreenStreams(stream, next);
+            if (generation !== wtnScreenPublishGenerationRef.current) {
+              await Promise.allSettled(
+                Object.values(publishers).map((publisher) =>
+                  publisher.close(),
+                ),
+              );
+              return;
+            }
+            wtnScreenPublishersRef.current = publishers;
+            send({ type: "share.updated", settings: next });
+            await Promise.allSettled(
+              Object.values(previous)
+                .filter(
+                  (publisher): publisher is WtnPublisher => Boolean(publisher),
+                )
+                .map((publisher) => publisher.close()),
+            );
+          } catch (error) {
+            if (generation === wtnScreenPublishGenerationRef.current) {
+              setNotice(
+                `${
+                  error instanceof Error
+                    ? error.message
+                    : "火山 WTN 重新发布失败"
+                }，已保留原共享参数`,
+              );
+            }
+          }
+        });
+        wtnScreenPublishQueueRef.current = task.catch(() => undefined);
+        await task;
         return;
       }
+      send({ type: "share.updated", settings: next });
       for (const outgoing of outgoingRef.current.values()) {
         await applySenderQuality(outgoing.pc, outgoing.quality, next);
       }
     },
-    [mediaMode, send],
+    [mediaMode, publishWtnScreenStreams, send],
   );
 
   const joinVoice = useCallback(async () => {
@@ -1710,6 +1810,7 @@ export function useRoomSession(
         wtnVoicePublisherRef.current = await publishToWtn(
           voiceSendStreamRef.current ?? stream,
           "voice",
+          undefined,
           settingsRef.current,
           resource,
         );

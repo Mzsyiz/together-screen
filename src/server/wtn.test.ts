@@ -17,9 +17,14 @@ const config: WtnServerConfig = {
 };
 
 describe("WTN helpers", () => {
-  it("creates protocol-safe deterministic stream IDs", () => {
-    expect(createWtnStreamId("room-2", "abc-def-123", "screen")).toBe(
-      "room2_abcdef123_screen",
+  it("creates protocol-safe independent stream IDs for each screen quality", () => {
+    expect(
+      createWtnStreamId("room-2", "abc-def-123", "screen", "preview"),
+    ).toBe(
+      "room2_abcdef123_screen_preview",
+    );
+    expect(createWtnStreamId("room-2", "abc-def-123", "screen", "hd")).toBe(
+      "room2_abcdef123_screen_hd",
     );
     expect(createWtnStreamId("room-6", "abc-def-123", "voice")).toBe(
       "room6_abcdef123_voice",
@@ -27,12 +32,22 @@ describe("WTN helpers", () => {
   });
 
   it("creates a unique stream ID for every publish attempt", () => {
-    const first = createWtnPublishStreamId("room-4", "user-123", "screen");
-    const second = createWtnPublishStreamId("room-4", "user-123", "screen");
+    const first = createWtnPublishStreamId(
+      "room-4",
+      "user-123",
+      "screen",
+      "preview",
+    );
+    const second = createWtnPublishStreamId(
+      "room-4",
+      "user-123",
+      "screen",
+      "preview",
+    );
     expect(first).toMatch(/^[a-zA-Z0-9_]+$/);
     expect(first.length).toBeLessThanOrEqual(64);
     expect(first).not.toBe(second);
-    expect(first).toContain("room4_user123_screen_");
+    expect(first).toContain("room4_user123_screen_preview_");
   });
 
   it("creates an HS256 JWT with publish claims", () => {
@@ -60,7 +75,7 @@ describe("WTN helpers", () => {
     expect(signature).toBe(expected);
   });
 
-  it("builds separate publish and simulcast subscription URLs", () => {
+  it("builds independent preview and HD resources without RID switching", () => {
     const publish = createWtnResource({
       config,
       action: "pub",
@@ -68,6 +83,8 @@ describe("WTN helpers", () => {
       roomId: "room-3",
       ownerId: "user-123",
       clientId: "client-1",
+      quality: "preview",
+      streamId: "room3_user123_screen_preview_abcd1234",
     });
     const subscribe = createWtnResource({
       config,
@@ -76,14 +93,37 @@ describe("WTN helpers", () => {
       roomId: "room-3",
       ownerId: "user-123",
       clientId: "client-2",
-      rid: "high",
+      quality: "hd",
+      streamId: "room3_user123_screen_hd_abcd1234",
     });
 
-    expect(publish.url).toContain("/pub/app123/room3_user123_screen");
-    expect(subscribe.url).toContain("/sub/app123/room3_user123_screen");
+    expect(publish.url).toContain(
+      "/pub/app123/room3_user123_screen_preview_abcd1234",
+    );
+    expect(subscribe.url).toContain(
+      "/sub/app123/room3_user123_screen_hd_abcd1234",
+    );
     expect(subscribe.url).toContain("BusinessID=together-screen");
     expect(subscribe.url).toContain("ClientID=client-2");
-    expect(subscribe.url).toContain("RID=High");
+    expect(subscribe.url).not.toContain("RID=");
+    expect(publish.quality).toBe("preview");
+    expect(subscribe.quality).toBe("hd");
+    expect(publish.streamId).not.toBe(subscribe.streamId);
     expect(publish.token).not.toBe(subscribe.token);
+  });
+
+  it("keeps voice as a single resource and screen qualities isolated", () => {
+    const voice = createWtnResource({
+      config,
+      action: "sub",
+      kind: "voice",
+      roomId: "room-3",
+      ownerId: "user-123",
+      clientId: "client-2",
+      streamId: "room3_user123_voice_abcd1234",
+    });
+    expect(voice.url).toContain("/sub/app123/room3_user123_voice_abcd1234");
+    expect(voice.url).not.toContain("RID=");
+    expect(voice.quality).toBeUndefined();
   });
 });

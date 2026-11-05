@@ -125,7 +125,9 @@ Check:
 
 The browser must never receive `WTN_APP_KEY`. If a WTN request fails, use the response status and the browser Network panel; do not paste the full JWTs into public Issues.
 
-If WTN returns `Invalid RID`, the application falls back to its default video layer. Viewing continues, and the tile shows `WTN default quality · compatibility preview`. Low/HD layer switching resumes automatically when the WTN application and published SDP expose compatible `Low`/`High` RIDs.
+WTN screen quality no longer depends on `RID`. Every share creates two independent StreamIDs; their request paths contain `_screen_preview` and `_screen_hd`. Hovering should show “lightweight preview”, a click should show “switching to HD”, and the HD badge should appear only after the independent HD subscription succeeds. If the HD subscription fails, the viewer remains on preview and receives the error. Server logs or the Network panel should show the HD publish and subscribe requests.
+
+If preview works but HD never appears, check that the second screen publish request succeeded, that the WTN application permits two streams from the same user, and that the room has not reached a WTN concurrency limit. Do not paste full JWTs into public Issues.
 
 ## Settings popovers do not appear
 

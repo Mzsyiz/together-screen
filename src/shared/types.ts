@@ -9,6 +9,7 @@ export const ROOM_DEFINITIONS = [
 export type RoomId = (typeof ROOM_DEFINITIONS)[number]["id"];
 export type MediaMode = "p2p" | "wtn";
 export type WtnMediaKind = "screen" | "voice";
+export type WtnStreamQuality = "preview" | "hd";
 
 export interface PublicUser {
   id: string;
@@ -71,13 +72,14 @@ export interface WtnPublishResource {
   url: string;
   token: string;
   streamId: string;
+  quality?: WtnStreamQuality;
 }
 
 export interface WtnSubscribeResource {
   url: string;
   token: string;
   streamId: string;
-  rid: "low" | "high";
+  quality?: WtnStreamQuality;
 }
 
 export type QualityLevel = "low" | "hd";

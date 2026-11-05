@@ -26,10 +26,10 @@
 
 - P2P 连接协商完成前不再调用 `setParameters()`。
 - 移除 Chromium WTN 不支持的 `sendEncodings.priority` 字段。
-- WTN 使用兼容的 `Low` / `High` RID，并增加不带 RID 的订阅回退。
-- WTN 回退为单一默认层后停止 RID 重试循环，避免观看端 React 状态溢出崩溃。
+- WTN 屏幕改为独立发布和订阅 `preview` / `hd` 双流，不再依赖 Simulcast RID。
+- WTN 高清切换失败时保留现有预览流，避免观看中断或重试循环崩溃。
 - 每次共享生成唯一 WTN 发布 StreamID，并阻止重复点击启动，修复 431 冲突。
-- WTN 无 RID 回退改为静默兼容模式，不再打断观看。
+- WTN 不再显示误导性的 RID 兼容提示，画质角标直接反映实际订阅流。
 - 完整错误信息固定显示在所有房间控件上方，并支持选择与复制。
 
 ### 安全

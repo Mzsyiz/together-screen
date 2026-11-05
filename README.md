@@ -43,8 +43,8 @@ The project is currently an **MVP / 0.x** application. Desktop Chrome and Edge a
 - Managed Volcengine WTN publishing and subscriptions when enabled for the room.
 - Default `720p / 30 FPS / 3 Mbps`.
 - Clarity, Balanced, Motion and Data Saver presets.
-- Lightweight poster by default, about 300 Kbps preview on hover, and HD only after a click.
-- The sharer confirms that sender encoding changes were applied before the viewer displays “HD”.
+- Lightweight poster by default, about 300 Kbps preview on hover, and an explicit HD stream after a click.
+- P2P confirms sender encoding changes; WTN subscribes to an independently published HD stream.
 - Capture dimensions are constrained to 720p or 1080p according to the selected preset.
 - Grid, spotlight, secondary-share strip and fullscreen layouts.
 - Remote video stays alive when idle or unfocused and is covered by a poster rather than paused into a black frame.
@@ -98,7 +98,7 @@ flowchart LR
 
 The application server handles accounts, sessions, room state, signaling and chat. Screen and voice media normally flow directly between browsers. TURN relays media when direct NAT traversal fails.
 
-In a WTN room, each participant publishes separate screen and voice streams to Volcengine and viewers create independent subscriptions. The application server remains the control plane and issues short-lived WTN JWTs without exposing `WTN_APP_KEY` to the browser.
+In a WTN room, each participant publishes separate screen-preview, screen-HD and voice streams to Volcengine, and viewers create subscriptions on demand. The dual-stream design does not depend on WTN simulcast RIDs and adds roughly 300 Kbps to a screen sharer's upload. The application server remains the control plane and issues short-lived WTN JWTs without exposing `WTN_APP_KEY` to the browser.
 
 A mesh room can have up to `N × (N - 1)` directional media links. In a six-person room where everyone shares HD video, each sender may need to encode five outgoing streams. This design targets small rooms, not large conferences.
 

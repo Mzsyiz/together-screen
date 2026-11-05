@@ -839,9 +839,9 @@ function VideoTile({
         ? `高清 · ${(share?.settings.bitrateKbps ?? 3000) / 1000} Mbps 上限 · ${resolutionLabel}`
         : "正在切换高清"
       : hovered
-        ? hdConfirmed
-          ? "WTN 默认质量 · 兼容预览"
-          : "轻量预览 · 300 Kbps 上限"
+        ? confirmedQuality === "low"
+          ? "轻量预览 · 300 Kbps 上限"
+          : "正在建立轻量预览"
         : "首帧";
 
   useEffect(() => {

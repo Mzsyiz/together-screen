@@ -9,6 +9,7 @@ import type {
   PublicUser,
   RoomId,
   WtnMediaKind,
+  WtnStreamQuality,
 } from "../shared/types.js";
 import { ROOM_DEFINITIONS } from "../shared/types.js";
 import {
@@ -202,7 +203,9 @@ export async function buildApp() {
     return { rooms: rooms.roomSummaries() };
   });
 
-  app.post<{ Body: { kind?: WtnMediaKind } }>(
+  app.post<{
+    Body: { kind?: WtnMediaKind; quality?: WtnStreamQuality };
+  }>(
     "/api/wtn/publish",
     async (request, reply) => {
       const user = requireUser(database, request, reply, activeClients);
@@ -218,8 +221,25 @@ export async function buildApp() {
       if (kind !== "screen" && kind !== "voice") {
         return reply.code(400).send({ error: "媒体类型不合法" });
       }
-      const streamId = createWtnPublishStreamId(room.id, user.id, kind);
-      wtnStreams.set(`${room.id}:${user.id}:${kind}`, streamId);
+      const quality = kind === "screen" ? request.body?.quality : undefined;
+      if (
+        kind === "screen" &&
+        quality !== "preview" &&
+        quality !== "hd"
+      ) {
+        return reply.code(400).send({ error: "屏幕画质不合法" });
+      }
+      const streamId = createWtnPublishStreamId(
+        room.id,
+        user.id,
+        kind,
+        quality,
+      );
+      const streamKey =
+        kind === "screen"
+          ? `${room.id}:${user.id}:screen:${quality}`
+          : `${room.id}:${user.id}:voice`;
+      wtnStreams.set(streamKey, streamId);
       return createWtnResource({
         config: appConfig.wtn,
         action: "pub",
@@ -227,6 +247,7 @@ export async function buildApp() {
         roomId: room.id,
         ownerId: user.id,
         clientId: user.id,
+        quality,
         streamId,
       });
     },
@@ -236,7 +257,7 @@ export async function buildApp() {
     Body: {
       ownerId?: string;
       kind?: WtnMediaKind;
-      rid?: "low" | "high";
+      quality?: WtnStreamQuality;
     };
   }>("/api/wtn/subscribe", async (request, reply) => {
     const user = requireUser(database, request, reply, activeClients);
@@ -264,9 +285,21 @@ export async function buildApp() {
     ) {
       return reply.code(409).send({ error: "目标媒体尚未发布" });
     }
-    const streamId = wtnStreams.get(`${room.id}:${ownerId}:${kind}`);
+    const quality = kind === "screen" ? request.body?.quality : undefined;
+    if (
+      kind === "screen" &&
+      quality !== "preview" &&
+      quality !== "hd"
+    ) {
+      return reply.code(400).send({ error: "屏幕画质不合法" });
+    }
+    const streamKey =
+      kind === "screen"
+        ? `${room.id}:${ownerId}:screen:${quality}`
+        : `${room.id}:${ownerId}:voice`;
+    const streamId = wtnStreams.get(streamKey);
     if (!streamId) {
-      return reply.code(409).send({ error: "WTN 发布资源尚未创建" });
+      return reply.code(409).send({ error: "该 WTN 媒体流尚未发布" });
     }
     return createWtnResource({
       config: appConfig.wtn,
@@ -275,7 +308,7 @@ export async function buildApp() {
       roomId: room.id,
       ownerId,
       clientId: user.id,
-      rid: request.body?.rid === "high" ? "high" : "low",
+      quality,
       streamId,
     });
   });

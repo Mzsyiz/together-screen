@@ -8,6 +8,7 @@ import type {
   RoomSummary,
   WtnMediaKind,
   WtnPublishResource,
+  WtnStreamQuality,
   WtnSubscribeResource,
 } from "../shared/types";
 
@@ -86,18 +87,18 @@ export const api = {
       method: "POST",
       body: JSON.stringify(input),
     }),
-  wtnPublish: (kind: WtnMediaKind) =>
+  wtnPublish: (kind: WtnMediaKind, quality?: WtnStreamQuality) =>
     request<WtnPublishResource>("/api/wtn/publish", {
       method: "POST",
-      body: JSON.stringify({ kind }),
+      body: JSON.stringify({ kind, quality }),
     }),
   wtnSubscribe: (
     ownerId: string,
     kind: WtnMediaKind,
-    rid: "low" | "high",
+    quality?: WtnStreamQuality,
   ) =>
     request<WtnSubscribeResource>("/api/wtn/subscribe", {
       method: "POST",
-      body: JSON.stringify({ ownerId, kind, rid }),
+      body: JSON.stringify({ ownerId, kind, quality }),
     }),
 };
