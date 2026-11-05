@@ -583,9 +583,6 @@ export function useRoomSession(
                 ? current
                 : { ...current, [ownerId]: "hd" },
             );
-            setNotice(
-              "当前 WTN 应用未返回 Low/High RID，已使用默认高质量订阅",
-            );
             return;
           }
           const latestRid = latest === "hd" ? "high" : "low";

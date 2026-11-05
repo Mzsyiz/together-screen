@@ -125,6 +125,8 @@ turnutils_stunclient turn.example.com
 
 浏览器不能获得 `WTN_APP_KEY`。WTN 请求失败时查看响应状态和浏览器 Network 面板，不要在公开 Issue 中粘贴完整 JWT。
 
+如果 WTN 返回 `Invalid RID`，系统会回退到 WTN 默认视频层。观看不会中断，画面角标显示“WTN 默认质量 · 兼容预览”。当 WTN 应用和发布 SDP 正确暴露兼容的 `Low` / `High` RID 后，会自动恢复低清和高清切换。
+
 ## 设置弹层不显示
 
 升级后强制刷新：

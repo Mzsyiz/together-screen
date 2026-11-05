@@ -125,6 +125,8 @@ Check:
 
 The browser must never receive `WTN_APP_KEY`. If a WTN request fails, use the response status and the browser Network panel; do not paste the full JWTs into public Issues.
 
+If WTN returns `Invalid RID`, the application falls back to its default video layer. Viewing continues, and the tile shows `WTN default quality · compatibility preview`. Low/HD layer switching resumes automatically when the WTN application and published SDP expose compatible `Low`/`High` RIDs.
+
 ## Settings popovers do not appear
 
 Hard refresh after upgrading:

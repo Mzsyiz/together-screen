@@ -29,6 +29,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - Used WTN-compatible `Low`/`High` RID values and added a no-RID subscription fallback.
 - Stopped RID retry loops when a WTN application falls back to a single default layer.
 - Generated a unique WTN publish StreamID for every share attempt and blocked duplicate start clicks.
+- Changed no-RID WTN fallback into a silent compatibility mode instead of an interrupting toast.
 - Made full error details visible, selectable and copyable above every room control.
 
 ### Security
