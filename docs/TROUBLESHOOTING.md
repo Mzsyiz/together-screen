@@ -110,6 +110,21 @@ turnutils_stunclient turn.example.com
 
 Also verify that UDP relay ports are allowed by both the OS firewall and the cloud security group.
 
+## Volcengine WTN fails
+
+Check:
+
+- `WTN_APP_ID` and `WTN_APP_KEY` are configured on the server;
+- the room is empty when changing its media mode;
+- the room badge and room header show “Volcengine WTN”;
+- publish and subscribe authentication are enabled in the WTN console;
+- the AppKey used by the server matches the WTN application;
+- the browser can access `wtn.volcvideo.com`;
+- the server clock is accurate, because JWTs use Unix expiry timestamps;
+- the room has not exceeded WTN billing or concurrency limits.
+
+The browser must never receive `WTN_APP_KEY`. If a WTN request fails, use the response status and the browser Network panel; do not paste the full JWTs into public Issues.
+
 ## Settings popovers do not appear
 
 Hard refresh after upgrading:

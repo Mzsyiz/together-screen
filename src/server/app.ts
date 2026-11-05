@@ -4,7 +4,12 @@ import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
 import cookie from "@fastify/cookie";
 import fastifyStatic from "@fastify/static";
 import websocket from "@fastify/websocket";
-import type { PublicUser, RoomId } from "../shared/types.js";
+import type {
+  MediaMode,
+  PublicUser,
+  RoomId,
+  WtnMediaKind,
+} from "../shared/types.js";
 import { ROOM_DEFINITIONS } from "../shared/types.js";
 import {
   getRequestUser,
@@ -19,6 +24,7 @@ import {
 import { appConfig, iceServersForUser } from "./config.js";
 import { AppDatabase } from "./db.js";
 import { RoomHub } from "./room-hub.js";
+import { createWtnResource } from "./wtn.js";
 
 const ROOM_IDS = new Set<string>(ROOM_DEFINITIONS.map((room) => room.id));
 function isRoomId(roomId: string): roomId is RoomId {
@@ -79,7 +85,7 @@ function requireAdmin(
 
 export async function buildApp() {
   const database = new AppDatabase(appConfig.databasePath);
-  const rooms = new RoomHub();
+  const rooms = new RoomHub(database.getRoomMediaModes());
   const loginAttempts = new Map<string, { count: number; resetAt: number }>();
   const activeClients = new Map<string, string>();
   const app = Fastify({
@@ -102,7 +108,10 @@ export async function buildApp() {
   app.get("/api/config", async (request, reply) => {
     const user = requireUser(database, request, reply, activeClients);
     if (!user) return reply;
-    return { iceServers: iceServersForUser(user.id) };
+    return {
+      iceServers: iceServersForUser(user.id),
+      wtnEnabled: appConfig.wtnEnabled,
+    };
   });
 
   app.post<{ Body: { username?: string; password?: string } }>(
@@ -189,6 +198,76 @@ export async function buildApp() {
     return { rooms: rooms.roomSummaries() };
   });
 
+  app.post<{ Body: { kind?: WtnMediaKind } }>(
+    "/api/wtn/publish",
+    async (request, reply) => {
+      const user = requireUser(database, request, reply, activeClients);
+      if (!user) return reply;
+      if (!appConfig.wtnEnabled) {
+        return reply.code(503).send({ error: "火山 WTN 尚未配置" });
+      }
+      const room = rooms.roomForUser(user.id);
+      if (!room || room.mediaMode !== "wtn") {
+        return reply.code(409).send({ error: "当前房间未启用火山 WTN" });
+      }
+      const kind = request.body?.kind;
+      if (kind !== "screen" && kind !== "voice") {
+        return reply.code(400).send({ error: "媒体类型不合法" });
+      }
+      return createWtnResource({
+        config: appConfig.wtn,
+        action: "pub",
+        kind,
+        roomId: room.id,
+        ownerId: user.id,
+        clientId: user.id,
+      });
+    },
+  );
+
+  app.post<{
+    Body: {
+      ownerId?: string;
+      kind?: WtnMediaKind;
+      rid?: "low" | "high";
+    };
+  }>("/api/wtn/subscribe", async (request, reply) => {
+    const user = requireUser(database, request, reply, activeClients);
+    if (!user) return reply;
+    if (!appConfig.wtnEnabled) {
+      return reply.code(503).send({ error: "火山 WTN 尚未配置" });
+    }
+    const room = rooms.roomForUser(user.id);
+    if (!room || room.mediaMode !== "wtn") {
+      return reply.code(409).send({ error: "当前房间未启用火山 WTN" });
+    }
+    const ownerId = String(request.body?.ownerId ?? "");
+    const kind = request.body?.kind;
+    if (
+      !ownerId ||
+      ownerId === user.id ||
+      (kind !== "screen" && kind !== "voice") ||
+      !rooms.hasMember(room.id, ownerId)
+    ) {
+      return reply.code(400).send({ error: "订阅目标不合法" });
+    }
+    if (
+      (kind === "screen" && !rooms.isSharing(room.id, ownerId)) ||
+      (kind === "voice" && !rooms.isVoiceEnabled(room.id, ownerId))
+    ) {
+      return reply.code(409).send({ error: "目标媒体尚未发布" });
+    }
+    return createWtnResource({
+      config: appConfig.wtn,
+      action: "sub",
+      kind,
+      roomId: room.id,
+      ownerId,
+      clientId: user.id,
+      rid: request.body?.rid === "high" ? "high" : "low",
+    });
+  });
+
   app.get<{ Params: { roomId: string }; Querystring: { limit?: string } }>(
     "/api/rooms/:roomId/messages",
     async (request, reply) => {
@@ -230,6 +309,43 @@ export async function buildApp() {
     const admin = requireAdmin(database, request, reply, activeClients);
     if (!admin) return reply;
     return { users: database.listUsers() };
+  });
+
+  app.get("/api/admin/rooms", async (request, reply) => {
+    const admin = requireAdmin(database, request, reply, activeClients);
+    if (!admin) return reply;
+    return {
+      rooms: rooms.roomSummaries(),
+      wtnEnabled: appConfig.wtnEnabled,
+    };
+  });
+
+  app.put<{
+    Params: { roomId: string };
+    Body: { mode?: MediaMode };
+  }>("/api/admin/rooms/:roomId/media", async (request, reply) => {
+    const admin = requireAdmin(database, request, reply, activeClients);
+    if (!admin) return reply;
+    const roomId = request.params.roomId;
+    const mode = request.body?.mode;
+    if (!isRoomId(roomId) || (mode !== "p2p" && mode !== "wtn")) {
+      return reply.code(400).send({ error: "房间或媒体模式不合法" });
+    }
+    if (mode === "wtn" && !appConfig.wtnEnabled) {
+      return reply.code(409).send({ error: "火山 WTN 尚未配置" });
+    }
+    const summary = rooms.roomSummaries().find((room) => room.id === roomId);
+    if (!summary) {
+      return reply.code(404).send({ error: "房间不存在" });
+    }
+    if (summary.occupants > 0) {
+      return reply.code(409).send({ error: "请等待房间内用户离开后再切换媒体模式" });
+    }
+    database.setRoomMediaMode(roomId, mode);
+    rooms.setRoomMediaMode(roomId, mode);
+    return {
+      room: rooms.roomSummaries().find((room) => room.id === roomId),
+    };
   });
 
   app.post<{

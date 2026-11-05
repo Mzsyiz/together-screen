@@ -97,4 +97,15 @@ describe("application database", () => {
     expect(database.getUserBySession(tokenHash("first-token"))).toBeNull();
     expect(database.getUserBySession(tokenHash("second-token"))).toBeNull();
   });
+
+  it("persists a media mode for each room", () => {
+    database.setRoomMediaMode("room-2", "wtn");
+    database.setRoomMediaMode("room-5", "p2p");
+    database.setRoomMediaMode("room-2", "p2p");
+
+    expect(database.getRoomMediaModes()).toEqual({
+      "room-2": "p2p",
+      "room-5": "p2p",
+    });
+  });
 });

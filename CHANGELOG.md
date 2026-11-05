@@ -10,6 +10,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ### Added
 
+- Per-room administrator-selected P2P/TURN or Volcengine WTN media transport.
+- Server-signed short-lived WTN JWTs and browser WHIP/WHEP publishing/subscribing.
 - Complete P2P room voice controls, devices, gain, levels, output volume and speaking indicators.
 - Architecture, deployment, troubleshooting and open-source contribution documentation.
 - GitHub CI, Issue templates, Pull Request template and Dependabot configuration.

@@ -4,6 +4,7 @@ import {
   type ActiveShare,
   type ChatMessage,
   type ClientEvent,
+  type MediaMode,
   type Participant,
   type PublicUser,
   type RoomId,
@@ -62,11 +63,13 @@ export class RoomHub {
   private readonly connections = new Map<string, Connection>();
   private readonly members = new Map<RoomId, Map<string, RoomMember>>();
   private readonly shares = new Map<RoomId, Map<string, LiveShare>>();
+  private readonly mediaModes = new Map<RoomId, MediaMode>();
 
-  constructor() {
+  constructor(initialModes: Partial<Record<RoomId, MediaMode>> = {}) {
     for (const room of ROOM_DEFINITIONS) {
       this.members.set(room.id, new Map());
       this.shares.set(room.id, new Map());
+      this.mediaModes.set(room.id, initialModes[room.id] ?? "p2p");
     }
   }
 
@@ -79,8 +82,37 @@ export class RoomHub {
         capacity: room.capacity,
         occupants,
         available: occupants < room.capacity,
+        mediaMode: this.mediaModes.get(room.id) ?? "p2p",
       };
     });
+  }
+
+  setRoomMediaMode(roomId: RoomId, mode: MediaMode) {
+    this.mediaModes.set(roomId, mode);
+  }
+
+  roomIdForUser(userId: string): RoomId | null {
+    for (const [roomId, roomMembers] of this.members) {
+      if (roomMembers.has(userId)) return roomId;
+    }
+    return null;
+  }
+
+  roomForUser(userId: string): RoomSummary | null {
+    const roomId = this.roomIdForUser(userId);
+    return roomId ? this.roomSummary(roomId) : null;
+  }
+
+  hasMember(roomId: RoomId, userId: string): boolean {
+    return this.members.get(roomId)?.has(userId) === true;
+  }
+
+  isVoiceEnabled(roomId: RoomId, userId: string): boolean {
+    return this.members.get(roomId)?.get(userId)?.voiceEnabled === true;
+  }
+
+  isSharing(roomId: RoomId, userId: string): boolean {
+    return this.shares.get(roomId)?.has(userId) === true;
   }
 
   attach(user: PublicUser, socket: WebSocket) {
@@ -421,6 +453,7 @@ export class RoomHub {
       capacity: 0,
       occupants: 0,
       available: false,
+      mediaMode: this.mediaModes.get(roomId) ?? "p2p",
     };
   }
 

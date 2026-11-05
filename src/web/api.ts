@@ -2,9 +2,13 @@ import type {
   AuthResponse,
   ChatMessage,
   ClientConfig,
+  MediaMode,
   PublicUser,
   RoomId,
   RoomSummary,
+  WtnMediaKind,
+  WtnPublishResource,
+  WtnSubscribeResource,
 } from "../shared/types";
 
 export class ApiError extends Error {
@@ -65,6 +69,13 @@ export const api = {
       body: JSON.stringify({ text }),
     }),
   adminUsers: () => request<{ users: PublicUser[] }>("/api/admin/users"),
+  adminRooms: () =>
+    request<{ rooms: RoomSummary[]; wtnEnabled: boolean }>("/api/admin/rooms"),
+  updateRoomMedia: (roomId: RoomId, mode: MediaMode) =>
+    request<{ room: RoomSummary }>(`/api/admin/rooms/${roomId}/media`, {
+      method: "PUT",
+      body: JSON.stringify({ mode }),
+    }),
   createUser: (input: {
     username: string;
     displayName: string;
@@ -74,5 +85,19 @@ export const api = {
     request<{ user: PublicUser }>("/api/admin/users", {
       method: "POST",
       body: JSON.stringify(input),
+    }),
+  wtnPublish: (kind: WtnMediaKind) =>
+    request<WtnPublishResource>("/api/wtn/publish", {
+      method: "POST",
+      body: JSON.stringify({ kind }),
+    }),
+  wtnSubscribe: (
+    ownerId: string,
+    kind: WtnMediaKind,
+    rid: "low" | "high",
+  ) =>
+    request<WtnSubscribeResource>("/api/wtn/subscribe", {
+      method: "POST",
+      body: JSON.stringify({ ownerId, kind, rid }),
     }),
 };

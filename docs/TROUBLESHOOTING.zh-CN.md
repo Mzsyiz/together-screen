@@ -110,6 +110,21 @@ turnutils_stunclient turn.example.com
 
 同时确认系统防火墙和云安全组都允许 UDP 中继端口。
 
+## 火山引擎 WTN 失败
+
+检查：
+
+- 服务端已经配置 `WTN_APP_ID` 和 `WTN_APP_KEY`；
+- 切换媒体模式时房间必须为空；
+- 房间卡片和房间顶部显示“火山 WTN”；
+- WTN 控制台已经开启推流鉴权和拉流鉴权；
+- 服务端 AppKey 与 WTN 应用一致；
+- 浏览器可以访问 `wtn.volcvideo.com`；
+- 服务器时间准确，因为 JWT 使用 Unix 过期时间；
+- 房间没有超过 WTN 计费或并发限制。
+
+浏览器不能获得 `WTN_APP_KEY`。WTN 请求失败时查看响应状态和浏览器 Network 面板，不要在公开 Issue 中粘贴完整 JWT。
+
 ## 设置弹层不显示
 
 升级后强制刷新：

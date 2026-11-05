@@ -44,6 +44,12 @@ STUN_URLS=stun:stun.l.google.com:19302,stun:stun.cloudflare.com:3478
 TURN_URLS=turn:turn.example.com:3478?transport=udp,turn:turn.example.com:3478?transport=tcp
 TURN_SECRET=replace-with-a-long-random-secret
 TURN_CREDENTIAL_TTL_SECONDS=3600
+
+WTN_APP_ID=
+WTN_APP_KEY=
+WTN_BUSINESS_ID=
+WTN_API_BASE_URL=https://wtn.volcvideo.com/webrtc
+WTN_TOKEN_TTL_SECONDS=600
 ```
 
 生成新的 TURN 密钥：
@@ -53,6 +59,19 @@ openssl rand -hex 32
 ```
 
 禁止复用曾进入 Git 或截图的密钥。
+
+## 2.1 火山引擎 WTN
+
+WTN 是可选媒体线路。要让管理员界面可以选择 WTN：
+
+1. 在火山引擎控制台创建 WebRTC 传输网络应用。
+2. 记录 `AppID`、`AppKey` 和可选的 `BusinessID`。
+3. 把它们写入服务器 `.env`。
+4. 生产环境在 WTN 控制台开启推流鉴权和拉流鉴权。
+5. `WTN_APP_KEY` 只放在服务端；浏览器只获取短期 JWT。
+6. 重启应用，在管理中心为没有成员的房间选择 WTN。
+
+房间中已有用户时不能切换媒体模式，应先等待房间清空。
 
 ## 3. 安装、构建并创建管理员
 
@@ -230,6 +249,8 @@ export APP_ORIGIN=https://screen.example.com
 export COOKIE_SECURE=true
 export TURN_URLS="turn:turn.example.com:3478?transport=udp"
 export TURN_SECRET="your-generated-secret"
+export WTN_APP_ID="your-app-id"
+export WTN_APP_KEY="your-app-key"
 docker compose up -d --build
 ```
 

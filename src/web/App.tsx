@@ -335,7 +335,7 @@ function Lobby({
         <div className="topbar-actions">
           {user.isAdmin && (
             <button className="ghost-button" onClick={onOpenAdmin}>
-              账户管理
+              管理中心
             </button>
           )}
           <span className="user-chip">
@@ -388,7 +388,10 @@ function Lobby({
               <div className="room-card-foot">
                 <div>
                   <h3>{room.name}</h3>
-                  <p>最多 {room.capacity} 人 · 同时投屏不限</p>
+                  <p>
+                    最多 {room.capacity} 人 ·{" "}
+                    {room.mediaMode === "wtn" ? "火山 WTN" : "自建 P2P"}
+                  </p>
                 </div>
                 <button
                   className="round-enter"
@@ -437,10 +440,12 @@ function Lobby({
 function SettingsMenu({
   settings,
   sharing,
+  mediaMode,
   onChange,
 }: {
   settings: ShareSettings;
   sharing: boolean;
+  mediaMode: RoomSummary["mediaMode"];
   onChange: (settings: ShareSettings) => void;
 }) {
   const presets: Array<{
@@ -490,7 +495,13 @@ function SettingsMenu({
       <div className="settings-popover">
         <div className="popover-title">
           <b>画质设置</b>
-          <span>{sharing ? "实时生效" : "下次共享生效"}</span>
+          <span>
+            {sharing
+              ? mediaMode === "wtn"
+                ? "WTN 将重新发布"
+                : "实时生效"
+              : "下次共享生效"}
+          </span>
         </div>
         <div className="quality-presets">
           {presets.map((preset) => (
@@ -604,7 +615,11 @@ function VoiceSettingsMenu({
           <div className="voice-join-card">
             <div>
               <b>加入房间语音</b>
-              <span>使用 WebRTC 点对点传输，不经过业务服务器</span>
+              <span>
+                {session.mediaMode === "wtn"
+                  ? "通过火山引擎 WTN 发布和订阅语音"
+                  : "使用 WebRTC 点对点传输，不经过业务服务器"}
+              </span>
             </div>
             <button
               className="primary-button"
@@ -794,6 +809,7 @@ function VideoTile({
   variant = "grid",
   onFocus,
   requestQuality,
+  releaseQuality,
 }: {
   participant: Participant;
   share: ActiveShare | null;
@@ -805,6 +821,7 @@ function VideoTile({
   variant?: "grid" | "spotlight" | "strip";
   onFocus: () => void;
   requestQuality: (ownerId: string, quality: QualityLevel) => void;
+  releaseQuality: (ownerId: string) => void;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const tileRef = useRef<HTMLDivElement>(null);
@@ -884,8 +901,14 @@ function VideoTile({
         setHovered(true);
         if (!focused) requestQuality(participant.id, "low");
       }}
-      onPointerLeave={() => setHovered(false)}
-      onMouseLeave={() => setHovered(false)}
+      onPointerLeave={() => {
+        setHovered(false);
+        if (!focused) releaseQuality(participant.id);
+      }}
+      onMouseLeave={() => {
+        setHovered(false);
+        if (!focused) releaseQuality(participant.id);
+      }}
       onClick={() => share && onFocus()}
       onDoubleClick={() => {
         if (variant === "spotlight") void fullscreen();
@@ -1235,7 +1258,12 @@ function RoomView({
   onLeave: () => void;
   onSessionReplaced: () => void;
 }) {
-  const session = useRoomSession(user, room.id, onSessionReplaced);
+  const session = useRoomSession(
+    user,
+    room.id,
+    room.mediaMode,
+    onSessionReplaced,
+  );
   const [muted, setMuted] = useState(true);
   const [stageLayout, setStageLayout] = useState<"grid" | "spotlight">("grid");
   const stageRef = useRef<HTMLElement>(null);
@@ -1358,7 +1386,8 @@ function RoomView({
           <div className="room-title">
             <b>{room.name}</b>
             <span>
-              {session.participants.length}/{room.capacity} 人
+              {session.participants.length}/{room.capacity} 人 ·{" "}
+              {room.mediaMode === "wtn" ? "火山 WTN" : "自建 P2P"}
             </span>
           </div>
         </div>
@@ -1465,6 +1494,7 @@ function RoomView({
                   confirmedQuality={session.confirmedQuality[participant.id]}
                   onFocus={() => selectShare(participant)}
                   requestQuality={session.requestQuality}
+                  releaseQuality={session.releaseQualityPreview}
                 />
               ))}
             </div>
@@ -1488,6 +1518,7 @@ function RoomView({
                   }
                 }}
                 requestQuality={session.requestQuality}
+                releaseQuality={session.releaseQualityPreview}
               />
               {secondaryParticipants.length > 0 && (
                 <aside className="share-strip" aria-label="其他共享画面">
@@ -1508,6 +1539,7 @@ function RoomView({
                       variant="strip"
                       onFocus={() => selectShare(participant)}
                       requestQuality={session.requestQuality}
+                      releaseQuality={session.releaseQualityPreview}
                     />
                   ))}
                 </aside>
@@ -1575,6 +1607,7 @@ function RoomView({
             <SettingsMenu
               settings={session.settings}
               sharing={Boolean(session.localStream)}
+              mediaMode={session.mediaMode}
               onChange={(settings) => void session.updateSettings(settings)}
             />
             <VoiceSettingsMenu
@@ -1634,6 +1667,9 @@ function RoomView({
 
 function AdminDialog({ onClose }: { onClose: () => void }) {
   const [users, setUsers] = useState<PublicUser[]>([]);
+  const [rooms, setRooms] = useState<RoomSummary[]>([]);
+  const [wtnEnabled, setWtnEnabled] = useState(false);
+  const [roomBusy, setRoomBusy] = useState<string | null>(null);
   const [form, setForm] = useState({
     username: "",
     displayName: "",
@@ -1645,10 +1681,17 @@ function AdminDialog({ onClose }: { onClose: () => void }) {
 
   const load = async () => {
     try {
-      const result = await api.adminUsers();
-      setUsers(result.users);
+      const [userResult, roomResult] = await Promise.all([
+        api.adminUsers(),
+        api.adminRooms(),
+      ]);
+      setUsers(userResult.users);
+      setRooms(roomResult.rooms);
+      setWtnEnabled(roomResult.wtnEnabled);
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "用户列表加载失败");
+      setError(
+        loadError instanceof Error ? loadError.message : "管理数据加载失败",
+      );
     }
   };
 
@@ -1671,13 +1714,35 @@ function AdminDialog({ onClose }: { onClose: () => void }) {
     }
   };
 
+  const updateRoomMode = async (
+    room: RoomSummary,
+    mode: RoomSummary["mediaMode"],
+  ) => {
+    setRoomBusy(room.id);
+    setError("");
+    try {
+      const result = await api.updateRoomMedia(room.id, mode);
+      setRooms((current) =>
+        current.map((candidate) =>
+          candidate.id === room.id ? result.room : candidate,
+        ),
+      );
+    } catch (updateError) {
+      setError(
+        updateError instanceof Error ? updateError.message : "媒体模式更新失败",
+      );
+    } finally {
+      setRoomBusy(null);
+    }
+  };
+
   return (
     <div className="modal-backdrop" onMouseDown={onClose}>
       <section className="admin-dialog" onMouseDown={(event) => event.stopPropagation()}>
         <header>
           <div>
             <span className="eyebrow">SYSTEM ADMIN</span>
-            <h2>账户管理</h2>
+            <h2>管理中心</h2>
           </div>
           <button className="icon-button" aria-label="关闭" onClick={onClose}>
             <Icon name="close" />
@@ -1727,6 +1792,40 @@ function AdminDialog({ onClose }: { onClose: () => void }) {
             <button className="primary-button" disabled={busy}>
               {busy ? "创建中…" : "创建账号"}
             </button>
+            <div className="admin-room-modes">
+              <div>
+                <h3>房间媒体线路</h3>
+                <span>
+                  {wtnEnabled
+                    ? "可为每个房间选择火山 WTN"
+                    : "配置 WTN_APP_ID / WTN_APP_KEY 后可选择火山"}
+                </span>
+              </div>
+              {rooms.map((room) => (
+                <label key={room.id}>
+                  <span>
+                    {room.name}
+                    <small>{room.occupants} 人在线</small>
+                  </span>
+                  <select
+                    value={room.mediaMode}
+                    disabled={room.occupants > 0 || roomBusy === room.id}
+                    onChange={(event) =>
+                      void updateRoomMode(
+                        room,
+                        event.target.value as RoomSummary["mediaMode"],
+                      )
+                    }
+                  >
+                    <option value="p2p">自建 P2P / TURN</option>
+                    <option value="wtn" disabled={!wtnEnabled}>
+                      火山引擎 WTN
+                    </option>
+                  </select>
+                </label>
+              ))}
+              <small>房间内有人时不允许切换，避免中断正在传输的媒体。</small>
+            </div>
           </form>
           <div className="admin-users">
             <h3>已有账号 <span>{users.length}</span></h3>

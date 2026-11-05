@@ -53,7 +53,7 @@ Check the export:
 ```bash
 cd ../together-screen-public
 find . -maxdepth 3 -type f | sort
-rg -n -S "(BEGIN PRIVATE KEY|static-auth-secret=|TURN_SECRET=.+|password=.+|api[_-]?key)" .
+rg -n -S "(BEGIN PRIVATE KEY|static-auth-secret=|TURN_SECRET=.+|WTN_APP_KEY=.+|password=.+|api[_-]?key)" .
 ```
 
 Then initialize a new repository:

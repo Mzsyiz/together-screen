@@ -44,6 +44,12 @@ STUN_URLS=stun:stun.l.google.com:19302,stun:stun.cloudflare.com:3478
 TURN_URLS=turn:turn.example.com:3478?transport=udp,turn:turn.example.com:3478?transport=tcp
 TURN_SECRET=replace-with-a-long-random-secret
 TURN_CREDENTIAL_TTL_SECONDS=3600
+
+WTN_APP_ID=
+WTN_APP_KEY=
+WTN_BUSINESS_ID=
+WTN_API_BASE_URL=https://wtn.volcvideo.com/webrtc
+WTN_TOKEN_TTL_SECONDS=600
 ```
 
 Generate a new TURN secret:
@@ -53,6 +59,19 @@ openssl rand -hex 32
 ```
 
 Never reuse a secret that was committed to Git or shared in a screenshot.
+
+## 2.1 Volcengine WTN
+
+WTN is optional. To make it selectable in the room admin UI:
+
+1. Create a WebRTC Transmission Network application in the Volcengine console.
+2. Record its `AppID`, `AppKey` and optional `BusinessID`.
+3. Put them in the server-side `.env`.
+4. Enable publish and subscribe authentication in WTN for production.
+5. Keep `WTN_APP_KEY` on the server; the browser receives only a short-lived JWT.
+6. Restart the application and open Admin Center to select WTN for an empty room.
+
+Rooms already containing users cannot change media mode. Switch the room while it is empty.
 
 ## 3. Install, build and create the admin
 
@@ -230,6 +249,8 @@ export APP_ORIGIN=https://screen.example.com
 export COOKIE_SECURE=true
 export TURN_URLS="turn:turn.example.com:3478?transport=udp"
 export TURN_SECRET="your-generated-secret"
+export WTN_APP_ID="your-app-id"
+export WTN_APP_KEY="your-app-key"
 docker compose up -d --build
 ```
 

@@ -99,6 +99,7 @@ refactor: simplify voice peer cleanup
 
 - `.env` 文件；
 - TURN 共享密钥或静态凭证；
+- WTN `AppKey` 或可重复使用的 WTN JWT；
 - SQLite 数据库；
 - Cookie 和会话令牌；
 - WebRTC 诊断 dump；

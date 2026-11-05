@@ -34,6 +34,18 @@ describe("room hub", () => {
   it("creates the five fixed capacity rooms", () => {
     const hub = new RoomHub();
     expect(hub.roomSummaries().map((room) => room.capacity)).toEqual([2, 3, 4, 5, 6]);
+    expect(hub.roomSummaries().every((room) => room.mediaMode === "p2p")).toBe(
+      true,
+    );
+  });
+
+  it("stores an independent media mode for each room", () => {
+    const hub = new RoomHub({ "room-2": "wtn" });
+    expect(hub.roomSummaries()[0].mediaMode).toBe("wtn");
+    expect(hub.roomSummaries()[1].mediaMode).toBe("p2p");
+
+    hub.setRoomMediaMode("room-3", "wtn");
+    expect(hub.roomSummaries()[1].mediaMode).toBe("wtn");
   });
 
   it("allows only one screen share per user and relays starts to others", () => {

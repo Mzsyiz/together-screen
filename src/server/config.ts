@@ -30,6 +30,16 @@ const turnCredentialTtlSeconds = Math.max(
   300,
   Number(process.env.TURN_CREDENTIAL_TTL_SECONDS ?? 3600),
 );
+const wtnAppId = process.env.WTN_APP_ID?.trim() ?? "";
+const wtnAppKey = process.env.WTN_APP_KEY?.trim() ?? "";
+const wtnBusinessId = process.env.WTN_BUSINESS_ID?.trim() ?? "";
+const wtnApiBaseUrl =
+  process.env.WTN_API_BASE_URL?.trim() || "https://wtn.volcvideo.com/webrtc";
+const wtnTokenTtlSeconds = Math.min(
+  3600,
+  Math.max(60, Number(process.env.WTN_TOKEN_TTL_SECONDS ?? 600)),
+);
+const wtnEnabled = Boolean(wtnAppId && wtnAppKey);
 
 export const appConfig = {
   port: Number(process.env.PORT ?? 3000),
@@ -51,6 +61,14 @@ export const appConfig = {
   turnCredential,
   turnSecret,
   turnCredentialTtlSeconds,
+  wtnEnabled,
+  wtn: {
+    appId: wtnAppId,
+    appKey: wtnAppKey,
+    businessId: wtnBusinessId,
+    apiBaseUrl: wtnApiBaseUrl,
+    tokenTtlSeconds: wtnTokenTtlSeconds,
+  },
 };
 
 export function iceServersForUser(userId: string): RtcIceServer[] {

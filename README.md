@@ -21,6 +21,10 @@ The project is currently an **MVP / 0.x** application. Desktop Chrome and Edge a
 
 ![Together Screen voice settings](docs/screenshots/voice-settings.png)
 
+### Admin media routing
+
+![Per-room media mode controls](docs/screenshots/admin-room-modes.png)
+
 </details>
 
 ## Features
@@ -28,6 +32,7 @@ The project is currently an **MVP / 0.x** application. Desktop Chrome and Edge a
 ### Fixed rooms
 
 - One room each for 2, 3, 4, 5 and 6 participants.
+- Administrators can select P2P/TURN or Volcengine WTN independently for each room.
 - An account can be active in only one room at a time.
 - Each user can share one screen at a time.
 - Multiple users can share screens simultaneously.
@@ -35,6 +40,7 @@ The project is currently an **MVP / 0.x** application. Desktop Chrome and Edge a
 ### Screen sharing
 
 - WebRTC peer-to-peer screen sharing; media does not pass through the application server by default.
+- Managed Volcengine WTN publishing and subscriptions when enabled for the room.
 - Default `720p / 30 FPS / 3 Mbps`.
 - Clarity, Balanced, Motion and Data Saver presets.
 - Lightweight poster by default, about 300 Kbps preview on hover, and HD only after a click.
@@ -47,6 +53,7 @@ The project is currently an **MVP / 0.x** application. Desktop Chrome and Edge a
 ### Voice chat
 
 - P2P microphone audio using the same STUN/TURN configuration as screen sharing.
+- Volcengine WTN microphone transport for rooms configured to use managed media.
 - Join, leave, mute and unmute.
 - Microphone device selection and device-change detection.
 - Input gain, input level, output volume and speaking indicators.
@@ -66,7 +73,7 @@ The project is currently an **MVP / 0.x** application. Desktop Chrome and Edge a
 | --- | --- |
 | Web client | React 19, TypeScript, Vite |
 | Application server | Node.js 22, Fastify, WebSocket |
-| Realtime media | WebRTC, STUN, coturn |
+| Realtime media | WebRTC, STUN, coturn, optional Volcengine WTN |
 | Persistence | SQLite |
 | Authentication | HttpOnly cookies, scrypt password hashing, expiring TURN credentials |
 | Testing | Vitest, TypeScript, Vite |
@@ -90,6 +97,8 @@ flowchart LR
 ```
 
 The application server handles accounts, sessions, room state, signaling and chat. Screen and voice media normally flow directly between browsers. TURN relays media when direct NAT traversal fails.
+
+In a WTN room, each participant publishes separate screen and voice streams to Volcengine and viewers create independent subscriptions. The application server remains the control plane and issues short-lived WTN JWTs without exposing `WTN_APP_KEY` to the browser.
 
 A mesh room can have up to `N × (N - 1)` directional media links. In a six-person room where everyone shares HD video, each sender may need to encode five outgoing streams. This design targets small rooms, not large conferences.
 
@@ -145,12 +154,13 @@ npm run user:list
 
 1. The administrator creates accounts and shares credentials with friends.
 2. Each participant signs in with their own account.
-3. Everyone enters the same capacity-matched room.
-4. Click “Share Screen” and select a window, tab or display.
-5. Other participants see the poster first. Hover for a lightweight preview and click for HD.
-6. Click “Join Voice” and allow microphone access.
-7. Open “Voice Settings” to select a microphone, adjust gain, change output volume or inspect connection state.
-8. Use the right sidebar for text and Emoji chat.
+3. The administrator selects P2P/TURN or Volcengine WTN for each empty room in “Admin Center”.
+4. Everyone enters the same capacity-matched room.
+5. Click “Share Screen” and select a window, tab or display.
+6. Other participants see the poster first. Hover for a lightweight preview and click for HD.
+7. Click “Join Voice” and allow microphone access.
+8. Open “Voice Settings” to select a microphone, adjust gain, change output volume or inspect connection state.
+9. Use the right sidebar for text and Emoji chat.
 
 Only one browser client can be active for an account. Signing in from a new browser or tab invalidates the previous active page.
 
@@ -188,6 +198,11 @@ cp .env.example .env
 | `TURN_CREDENTIAL` | Empty | Static TURN password |
 | `TURN_SECRET` | Empty | coturn shared secret; recommended |
 | `TURN_CREDENTIAL_TTL_SECONDS` | `3600` | Lifetime of generated TURN credentials |
+| `WTN_APP_ID` | Empty | Volcengine WTN application ID |
+| `WTN_APP_KEY` | Empty | Server-only WTN JWT signing key |
+| `WTN_BUSINESS_ID` | Empty | Optional WTN business ID |
+| `WTN_API_BASE_URL` | Volcengine endpoint | WTN WHIP/WHEP API base |
+| `WTN_TOKEN_TTL_SECONDS` | `600` | Lifetime of generated WTN JWTs |
 
 When a shared secret is configured, the server generates expiring per-user TURN credentials. Keep the real secret in a protected environment file only.
 
@@ -212,6 +227,7 @@ Production requirements:
 4. Persistent `DATA_DIR`.
 5. WebSocket Upgrade support in the reverse proxy.
 6. Reachable TURN for restrictive networks.
+7. Volcengine `WTN_APP_ID` and `WTN_APP_KEY` if any room uses WTN.
 
 See [Deployment](docs/DEPLOYMENT.md) for Nginx, systemd, coturn, Docker and Baota/aaPanel instructions.
 
@@ -220,6 +236,8 @@ See [Deployment](docs/DEPLOYMENT.md) for Nginx, systemd, coturn, Docker and Baot
 ```bash
 export APP_ORIGIN=http://localhost:3000
 export COOKIE_SECURE=false
+export WTN_APP_ID=""
+export WTN_APP_KEY=""
 docker compose up -d --build
 ```
 
@@ -250,6 +268,7 @@ Stop the service before copying the directory, or use a SQLite-aware backup that
 
 - Use a strong unique administrator password.
 - Never commit `.env`, SQLite files, WebRTC dumps, real IP addresses or TURN secrets.
+- Never expose or commit `WTN_APP_KEY`; browsers receive only short-lived JWTs.
 - Rotate a TURN secret immediately if it entered a public repository or diagnostic file.
 - Redact accounts, IPs and network metadata before posting WebRTC diagnostics.
 - Report vulnerabilities privately according to [SECURITY.md](SECURITY.md).
@@ -280,6 +299,7 @@ docs/             Architecture, deployment and troubleshooting
 - Safari and Firefox differ in screen and system-audio support.
 - No file/image transfer, message recall, audit log, user deletion UI or online-kick UI yet.
 - P2P and TURN quality depends on participant networks, carrier routing and server egress.
+- WTN rooms require a Volcengine account, AppID/AppKey and accepted WTN billing terms.
 
 See [Troubleshooting](docs/TROUBLESHOOTING.md) for common failures.
 

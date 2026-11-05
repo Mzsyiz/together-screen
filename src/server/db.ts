@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 import type {
   ChatMessage,
+  MediaMode,
   PublicUser,
   RoomId,
 } from "../shared/types.js";
@@ -27,6 +28,11 @@ interface MessageRow {
   username: string;
   display_name: string;
   is_admin: number;
+}
+
+interface RoomMediaSettingsRow {
+  room_id: RoomId;
+  media_mode: MediaMode;
 }
 
 function toPublicUser(row: UserRow): PublicUser {
@@ -93,6 +99,11 @@ export class AppDatabase {
 
       CREATE INDEX IF NOT EXISTS idx_sessions_expiry
       ON sessions(expires_at);
+
+      CREATE TABLE IF NOT EXISTS room_media_settings (
+        room_id TEXT PRIMARY KEY,
+        media_mode TEXT NOT NULL CHECK (media_mode IN ('p2p', 'wtn'))
+      );
     `);
   }
 
@@ -149,6 +160,25 @@ export class AppDatabase {
       .prepare("SELECT * FROM users ORDER BY username COLLATE NOCASE")
       .all() as unknown as UserRow[];
     return rows.map(toPublicUser);
+  }
+
+  getRoomMediaModes(): Partial<Record<RoomId, MediaMode>> {
+    const rows = this.db
+      .prepare("SELECT room_id, media_mode FROM room_media_settings")
+      .all() as unknown as RoomMediaSettingsRow[];
+    return Object.fromEntries(
+      rows.map((row) => [row.room_id, row.media_mode]),
+    ) as Partial<Record<RoomId, MediaMode>>;
+  }
+
+  setRoomMediaMode(roomId: RoomId, mediaMode: MediaMode) {
+    this.db
+      .prepare(
+        `INSERT INTO room_media_settings (room_id, media_mode)
+         VALUES (?, ?)
+         ON CONFLICT(room_id) DO UPDATE SET media_mode = excluded.media_mode`,
+      )
+      .run(roomId, mediaMode);
   }
 
   createSession(tokenHash: string, userId: string, expiresAt: string) {

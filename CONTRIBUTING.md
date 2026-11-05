@@ -99,6 +99,7 @@ Never commit:
 
 - `.env` files;
 - TURN shared secrets or static credentials;
+- WTN `AppKey` or reusable WTN JWTs;
 - SQLite databases;
 - cookies and session tokens;
 - WebRTC diagnostic dumps;

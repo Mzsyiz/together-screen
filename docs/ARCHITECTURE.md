@@ -52,6 +52,36 @@ For `N` participants, there can be up to `N × (N - 1)` directional media links.
 
 This is a cost-effective choice for small rooms. It becomes inefficient when the room grows: sender upload, browser encoding load and TURN egress all increase rapidly.
 
+## Per-room media modes
+
+Each fixed room stores a persistent `mediaMode`:
+
+- `p2p`: the existing browser mesh with STUN/TURN fallback;
+- `wtn`: Volcengine WebRTC Transmission Network publish/subscribe transport.
+
+Only an administrator can change the mode, and only while the room is empty. This avoids tearing down active media unexpectedly.
+
+### Volcengine WTN path
+
+WTN rooms publish screen and voice as separate streams:
+
+```text
+screen: <room>_<user>_screen
+voice:  <room>_<user>_voice
+```
+
+The publishing browser creates one WHIP-style `RTCPeerConnection` with simulcast encodings. Viewers create independent WHEP-style subscriptions and select the `low` or `high` RID. The existing poster remains visible while a subscription is being established.
+
+The Fastify server:
+
+- validates the user's room and media mode;
+- validates that a screen or voice stream is active before issuing a subscription resource;
+- creates protocol-safe stream IDs;
+- signs short-lived HS256 WTN JWTs;
+- returns only the WTN URL and token to the browser.
+
+`WTN_APP_KEY` remains server-only. Replacing or stopping a WTN publisher destroys its media resource; subscribers close their own resources when the preview is released or the participant leaves.
+
 ## Screen sharing flow
 
 ### Start sharing

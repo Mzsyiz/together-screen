@@ -52,6 +52,7 @@ Together Screen 假设：
 - 用户通过 HTTPS/WSS 访问；
 - 应用服务器和 SQLite 数据目录是可信的；
 - TURN 共享密钥只提供给应用服务器和 coturn；
+- WTN AppKey 只提供给应用服务器；
 - 在 TURN 中继前，房间媒体默认点对点传输。
 
 除 WebRTC 自身的传输加密外，项目不额外提供端到端加密。TURN 中继可以看到网络元数据，但不能解密 DTLS-SRTP 媒体。
@@ -63,6 +64,7 @@ Together Screen 假设：
 - 使用强且唯一的密码；
 - 及时更新 Node.js 和依赖；
 - 使用严格权限保护 `.env`；
+- 只在服务端保存 `WTN_APP_KEY`，浏览器只接收短期 WTN JWT；
 - 不直接暴露内部 Node 端口；
 - 使用有效 TLS 证书；
 - 只开放必要的 TURN 防火墙端口；

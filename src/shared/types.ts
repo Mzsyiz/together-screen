@@ -7,6 +7,8 @@ export const ROOM_DEFINITIONS = [
 ] as const;
 
 export type RoomId = (typeof ROOM_DEFINITIONS)[number]["id"];
+export type MediaMode = "p2p" | "wtn";
+export type WtnMediaKind = "screen" | "voice";
 
 export interface PublicUser {
   id: string;
@@ -21,6 +23,7 @@ export interface RoomSummary {
   capacity: number;
   occupants: number;
   available: boolean;
+  mediaMode: MediaMode;
 }
 
 export interface Participant extends PublicUser {
@@ -61,6 +64,20 @@ export interface RtcIceServer {
 
 export interface ClientConfig {
   iceServers: RtcIceServer[];
+  wtnEnabled: boolean;
+}
+
+export interface WtnPublishResource {
+  url: string;
+  token: string;
+  streamId: string;
+}
+
+export interface WtnSubscribeResource {
+  url: string;
+  token: string;
+  streamId: string;
+  rid: "low" | "high";
 }
 
 export type QualityLevel = "low" | "hd";

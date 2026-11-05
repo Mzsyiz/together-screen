@@ -21,6 +21,10 @@ Together Screen 是一个面向朋友小群体的自托管 WebRTC 投屏房间�
 
 ![Together Screen voice settings](docs/screenshots/voice-settings.png)
 
+### 管理员媒体线路
+
+![每个房间的媒体模式控制](docs/screenshots/admin-room-modes.png)
+
 </details>
 
 ## 核心特性
@@ -28,6 +32,7 @@ Together Screen 是一个面向朋友小群体的自托管 WebRTC 投屏房间�
 ### 固定房间
 
 - 双人房、三人房、四人房、五人房、六人房各一个。
+- 管理员可以为每个房间独立选择“自建 P2P/TURN”或“火山引擎 WTN”。
 - 一个账号同一时间只能在一个房间。
 - 每位用户同一时间只能共享一块屏幕。
 - 同一房间允许多人同时投屏，不限制同时共享的人数。
@@ -35,6 +40,7 @@ Together Screen 是一个面向朋友小群体的自托管 WebRTC 投屏房间�
 ### 屏幕共享
 
 - WebRTC 点对点屏幕共享，业务服务器不转发媒体流。
+- 房间启用 WTN 时，通过火山引擎托管网络发布和订阅媒体。
 - 默认 `720p / 30 FPS / 3 Mbps`。
 - 支持清晰优先、平衡、流畅优先和省带宽预设。
 - 默认只显示轻量首帧，鼠标悬浮时播放约 300 Kbps 低码率预览。
@@ -47,6 +53,7 @@ Together Screen 是一个面向朋友小群体的自托管 WebRTC 投屏房间�
 ### 在线语音
 
 - P2P 麦克风语音，复用屏幕共享的 STUN/TURN 配置。
+- 配置为 WTN 的房间通过火山引擎传输麦克风语音。
 - 加入、退出、静音和取消静音。
 - 麦克风设备选择与热插拔检测。
 - 麦克风输入增益、输入电平和语音输出音量。
@@ -68,7 +75,7 @@ Together Screen 是一个面向朋友小群体的自托管 WebRTC 投屏房间�
 | --- | --- |
 | Web 前端 | React 19、TypeScript、Vite |
 | 业务服务 | Node.js 22、Fastify、WebSocket |
-| 实时媒体 | WebRTC、STUN、coturn |
+| 实时媒体 | WebRTC、STUN、coturn、可选火山引擎 WTN |
 | 数据存储 | SQLite |
 | 身份认证 | HttpOnly Cookie、scrypt 密码哈希、限时 TURN 凭证 |
 | 测试与构建 | Vitest、TypeScript、Vite |
@@ -92,6 +99,8 @@ flowchart LR
 ```
 
 业务服务器负责账号、会话、房间状态、WebRTC 信令和聊天。媒体默认在浏览器之间直连；当 NAT 无法打洞时，由 TURN 中继。
+
+当房间使用 WTN 时，每位用户把屏幕流和语音流分别发布到火山引擎，观看者创建独立订阅。业务服务器继续负责账号、房间和聊天，并签发短期 WTN JWT，浏览器不会获得 `WTN_APP_KEY`。
 
 网状连接的数量约为 `N × (N - 1)`。六人房内所有人都高清共享时，每位用户最多需要向另外五人编码发送画面。因此当前设计适合最多六人的小房间，而不是大型会议。
 
@@ -147,12 +156,13 @@ npm run user:list
 
 1. 管理员创建账号并把账号密码发给朋友。
 2. 每位朋友使用自己的账号登录。
-3. 所有人进入同一个人数匹配的房间。
-4. 点击底部“共享屏幕”，选择浏览器窗口、标签页或完整屏幕。
-5. 其他成员默认看到首帧；悬浮查看轻量预览，点击切换高清。
-6. 点击底部“加入语音”并允许麦克风权限。
-7. 通过“语音设置”选择麦克风、调整增益、输出音量或查看连接状态。
-8. 使用右侧聊天栏发送文字或 Emoji。
+3. 管理员在“管理中心”为每个空房间选择自建 P2P 或火山 WTN。
+4. 所有人进入同一个人数匹配的房间。
+5. 点击底部“共享屏幕”，选择浏览器窗口、标签页或完整屏幕。
+6. 其他成员默认看到首帧；悬浮查看轻量预览，点击切换高清。
+7. 点击底部“加入语音”并允许麦克风权限。
+8. 通过“语音设置”选择麦克风、调整增益、输出音量或查看连接状态。
+9. 使用右侧聊天栏发送文字或 Emoji。
 
 同一账号只允许一个活跃页面。在新设备或新标签页登录会注销旧页面，这是为了避免重复身份和信令冲突。
 
@@ -192,6 +202,11 @@ cp .env.example .env
 | `TURN_CREDENTIAL` | 空 | 静态 TURN 密码 |
 | `TURN_SECRET` | 空 | coturn 共享密钥，推荐使用 |
 | `TURN_CREDENTIAL_TTL_SECONDS` | `3600` | 动态 TURN 凭证有效期 |
+| `WTN_APP_ID` | 空 | 火山引擎 WTN 应用 ID |
+| `WTN_APP_KEY` | 空 | 仅服务端使用的 WTN JWT 签名密钥 |
+| `WTN_BUSINESS_ID` | 空 | 可选 WTN 业务 ID |
+| `WTN_API_BASE_URL` | 火山默认地址 | WTN WHIP/WHEP API 根地址 |
+| `WTN_TOKEN_TTL_SECONDS` | `600` | 短期 WTN JWT 有效期 |
 
 使用共享密钥时，业务服务会为每个登录用户生成带过期时间的 TURN 用户名和 HMAC 凭证。真实密钥只能保存在服务器环境变量或权限受限的 `.env` 中，禁止提交到 Git。
 
@@ -216,6 +231,7 @@ npm start
 4. 使用持久化 `DATA_DIR`。
 5. 反向代理支持 WebSocket Upgrade。
 6. 严格 NAT 用户需要可用的 TURN。
+7. 任一房间使用 WTN 时，需要配置火山引擎 `WTN_APP_ID` 和 `WTN_APP_KEY`。
 
 完整的 Nginx、systemd、宝塔和 coturn 配置见 [部署指南](docs/DEPLOYMENT.zh-CN.md)。
 
@@ -226,6 +242,8 @@ npm start
 ```bash
 export APP_ORIGIN=http://localhost:3000
 export COOKIE_SECURE=false
+export WTN_APP_ID=""
+export WTN_APP_KEY=""
 docker compose up -d --build
 ```
 
@@ -258,6 +276,7 @@ data/
 
 - 项目不开放公开注册，但生产部署仍应使用强管理员密码。
 - 不要提交 `.env`、数据库、WebRTC dump、真实 IP 或 TURN 密钥。
+- 不得暴露或提交 `WTN_APP_KEY`；浏览器只应获得短期 JWT。
 - 如果 TURN 密钥曾经进入公开仓库，应立即轮换并清理 Git 历史。
 - WebRTC 诊断文件可能包含 IP、候选地址和网络统计，分享前务必脱敏。
 - 安全问题请不要创建公开 Issue，具体流程见 [安全策略](SECURITY.zh-CN.md)。
@@ -295,6 +314,7 @@ docs/             架构、部署与排障文档
 - 浏览器无法保证所有系统都能采集完整系统声音。
 - 当前没有消息撤回、图片/文件传输、审计日志、用户删除和在线踢人界面。
 - P2P 和 TURN 的实际质量取决于双方网络、运营商和服务器带宽。
+- WTN 房间需要火山引擎账号、AppID/AppKey，并接受 WTN 的计费和合规条款。
 
 更多问题排查见 [故障排查](docs/TROUBLESHOOTING.zh-CN.md)。
 

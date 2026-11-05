@@ -52,6 +52,7 @@ Together Screen assumes:
 - users connect over HTTPS/WSS;
 - the application server and SQLite data directory are trusted;
 - the TURN shared secret is available only to the application server and coturn;
+- the WTN AppKey is available only to the application server;
 - room media is peer-to-peer unless TURN relaying is required.
 
 The project does not provide end-to-end encryption beyond WebRTC transport encryption. A TURN relay can observe network metadata but does not decrypt DTLS-SRTP media.
@@ -63,6 +64,7 @@ Operators must:
 - use strong unique passwords;
 - keep Node.js and dependencies updated;
 - protect `.env` with restrictive permissions;
+- keep `WTN_APP_KEY` server-side and return only expiring WTN JWTs;
 - avoid exposing the internal Node port;
 - use a valid TLS certificate;
 - restrict firewall access to required TURN ports;

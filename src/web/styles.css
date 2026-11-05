@@ -2394,16 +2394,20 @@ select:focus {
 .admin-content {
   display: grid;
   grid-template-columns: 0.9fr 1.1fr;
+  height: min(640px, calc(100vh - 9rem));
   min-height: 430px;
   max-height: calc(100vh - 9rem);
+  overflow: hidden;
 }
 
 .admin-form {
+  min-height: 0;
   display: grid;
   align-content: start;
   gap: 0.95rem;
   padding: 1.3rem;
   border-right: 1px solid var(--line);
+  overflow-y: auto;
 }
 
 .admin-form h3,
@@ -2434,6 +2438,55 @@ select:focus {
   min-height: 42px;
   margin-top: 0.2rem;
   font-size: 0.76rem;
+}
+
+.admin-room-modes {
+  display: grid;
+  gap: 0.55rem;
+  margin-top: 0.35rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+}
+
+.admin-room-modes > div:first-child {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.admin-room-modes > div:first-child span,
+.admin-room-modes > small {
+  color: var(--muted);
+  font-size: 0.56rem;
+  line-height: 1.5;
+}
+
+.admin-room-modes label {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) 150px !important;
+  align-items: center;
+  gap: 0.65rem !important;
+}
+
+.admin-room-modes label > span {
+  display: grid;
+  gap: 0.12rem;
+  color: var(--muted-strong);
+  font-size: 0.66rem;
+}
+
+.admin-room-modes label small {
+  color: var(--muted);
+  font-size: 0.52rem;
+}
+
+.admin-room-modes select {
+  height: 34px;
+  padding: 0 0.45rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--muted-strong);
+  background: #171a23;
+  font-size: 0.62rem;
 }
 
 .admin-users {

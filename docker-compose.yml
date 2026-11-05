@@ -16,6 +16,11 @@ services:
       TURN_CREDENTIAL: "${TURN_CREDENTIAL:-}"
       TURN_SECRET: "${TURN_SECRET:-}"
       TURN_CREDENTIAL_TTL_SECONDS: "${TURN_CREDENTIAL_TTL_SECONDS:-3600}"
+      WTN_APP_ID: "${WTN_APP_ID:-}"
+      WTN_APP_KEY: "${WTN_APP_KEY:-}"
+      WTN_BUSINESS_ID: "${WTN_BUSINESS_ID:-}"
+      WTN_API_BASE_URL: "${WTN_API_BASE_URL:-https://wtn.volcvideo.com/webrtc}"
+      WTN_TOKEN_TTL_SECONDS: "${WTN_TOKEN_TTL_SECONDS:-600}"
     volumes:
       - together-data:/data
 
