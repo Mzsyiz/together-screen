@@ -1534,7 +1534,7 @@ select:focus {
 }
 
 .video-tile video,
-.video-tile .first-frame {
+.video-tile .last-frame {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -1543,16 +1543,27 @@ select:focus {
   background: #050608;
 }
 
-.video-tile .first-frame {
+.video-tile .last-frame {
   z-index: 2;
   object-fit: contain;
   filter: brightness(0.8) saturate(0.9);
   transition: opacity 160ms ease;
 }
 
-.video-tile.has-frame:not(.show-poster) .first-frame {
-  opacity: 0;
-  visibility: hidden;
+.last-frame-placeholder {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  color: var(--muted);
+  background:
+    radial-gradient(circle at 50% 38%, rgba(67, 214, 165, 0.08), transparent 36%),
+    #080b10;
+  font-size: 0.6rem;
 }
 
 .frame-buffering {

@@ -43,11 +43,12 @@ The project is currently an **MVP / 0.x** application. Desktop Chrome and Edge a
 - Managed Volcengine WTN publishing and subscriptions when enabled for the room.
 - Default `720p / 30 FPS / 3 Mbps`.
 - Clarity, Balanced, Motion and Data Saver presets.
-- Lightweight poster by default, about 300 Kbps preview on hover, and an explicit HD stream after a click.
+- Idle tiles show the last real decoded frame instead of the stale share-start poster.
+- The first visit automatically captures one lightweight frame; a live 300 Kbps preview starts only on hover.
 - P2P confirms sender encoding changes; WTN subscribes to an independently published HD stream.
 - Capture dimensions are constrained to 720p or 1080p according to the selected preset.
 - Grid, spotlight, secondary-share strip and fullscreen layouts.
-- Remote video stays alive when idle or unfocused and is covered by a poster rather than paused into a black frame.
+- Leaving or unfocusing a tile freezes its latest real frame, so it never falls back to the old first frame or a black canvas.
 - Screen audio is supported when the operating system and browser expose it.
 
 ### Voice chat
@@ -157,7 +158,7 @@ npm run user:list
 3. The administrator selects P2P/TURN or Volcengine WTN for each empty room in “Admin Center”.
 4. Everyone enters the same capacity-matched room.
 5. Click “Share Screen” and select a window, tab or display.
-6. Other participants see the poster first. Hover for a lightweight preview and click for HD.
+6. Other participants see the latest real frame first. Hover for a lightweight preview and click for HD.
 7. Click “Join Voice” and allow microphone access.
 8. Open “Voice Settings” to select a microphone, adjust gain, change output volume or inspect connection state.
 9. Use the right sidebar for text and Emoji chat.
@@ -168,7 +169,7 @@ Only one browser client can be active for an account. Signing in from a new brow
 
 | State | Defaults | Behavior |
 | --- | --- | --- |
-| Poster | JPEG first frame | Shown while idle; the media track remains alive |
+| Latest frame | Last decoded frame | Shown while idle; the first visit automatically captures a fresh frame |
 | Preview | About 300 Kbps, 15 FPS, about 360p | Shown on hover |
 | HD | 720p, 30 FPS, up to 3 Mbps | Shown after click and sender confirmation |
 | Clarity | 1080p, 30 FPS, up to 5 Mbps | Text, code and static detail |

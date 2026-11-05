@@ -34,7 +34,7 @@ Recommend desktop Chrome or Edge.
 
 ## Remote video is black
 
-The current client keeps WebRTC video playing while idle and covers it with a poster. If video still turns black:
+The current client caches the latest real decoded frame and uses it while a tile is idle. If video still turns black:
 
 1. Hover the tile to reveal the live preview.
 2. Check whether the sender still shows “Stopping share” incorrectly.
@@ -48,7 +48,7 @@ Do not upload a raw WebRTC dump publicly; it may contain IP addresses and networ
 
 Check the quality state:
 
-- “First frame” means only the poster is visible.
+- “Latest frame · Frozen” means the last real decoded frame is visible.
 - “Preview” is intentionally low bitrate and about 360p.
 - “HD” appears only after the sharer confirms sender parameters.
 

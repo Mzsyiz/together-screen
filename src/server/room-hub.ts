@@ -308,7 +308,7 @@ export class RoomHub {
       return;
     }
     if (!poster.startsWith("data:image/") || poster.length > 800_000) {
-      send(connection.socket, { type: "room.error", message: "首帧图片不合法" });
+      send(connection.socket, { type: "room.error", message: "共享启动快照不合法" });
       return;
     }
     const member = this.members.get(roomId)?.get(connection.user.id);

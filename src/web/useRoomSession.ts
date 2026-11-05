@@ -79,13 +79,16 @@ function resolutionConstraints(resolution: ShareSettings["resolution"]) {
   return {};
 }
 
-async function capturePoster(stream: MediaStream): Promise<string> {
+async function captureStartupSnapshot(stream: MediaStream): Promise<string> {
   const video = document.createElement("video");
   video.muted = true;
   video.playsInline = true;
   video.srcObject = stream;
   await new Promise<void>((resolve, reject) => {
-    const timeout = window.setTimeout(() => reject(new Error("等待首帧超时")), 6000);
+    const timeout = window.setTimeout(
+      () => reject(new Error("等待共享画面超时")),
+      6000,
+    );
     video.onloadeddata = () => {
       window.clearTimeout(timeout);
       resolve();
@@ -113,7 +116,7 @@ async function capturePoster(stream: MediaStream): Promise<string> {
   canvas.width = width;
   canvas.height = height;
   const context = canvas.getContext("2d");
-  if (!context) throw new Error("无法生成首帧");
+  if (!context) throw new Error("无法生成共享启动快照");
   context.drawImage(video, 0, 0, width, height);
   video.pause();
   video.srcObject = null;
@@ -232,7 +235,7 @@ export function useRoomSession(
   const socketRef = useRef<WebSocket | null>(null);
   const rtcConfigRef = useRef<RTCConfiguration>({ iceServers: [] });
   const localStreamRef = useRef<MediaStream | null>(null);
-  const localPosterRef = useRef<string | null>(null);
+  const localSnapshotRef = useRef<string | null>(null);
   const micStreamRef = useRef<MediaStream | null>(null);
   const voiceSendStreamRef = useRef<MediaStream | null>(null);
   const voiceAudioContextRef = useRef<AudioContext | null>(null);
@@ -1555,11 +1558,11 @@ export function useRoomSession(
         socket.onopen = () => {
           setConnectionState("connected");
           socket.send(JSON.stringify({ type: "room.join", roomId } satisfies ClientEvent));
-          if (localStreamRef.current && localPosterRef.current) {
+          if (localStreamRef.current && localSnapshotRef.current) {
             socket.send(
               JSON.stringify({
                 type: "share.started",
-                poster: localPosterRef.current,
+                poster: localSnapshotRef.current,
                 settings: settingsRef.current,
               } satisfies ClientEvent),
             );
@@ -1618,7 +1621,7 @@ export function useRoomSession(
       const stream = localStreamRef.current;
       if (stream) for (const track of stream.getTracks()) track.stop();
       localStreamRef.current = null;
-      localPosterRef.current = null;
+      localSnapshotRef.current = null;
       const micStream = micStreamRef.current;
       micStreamRef.current = null;
       if (micStream) for (const track of micStream.getTracks()) track.stop();
@@ -1669,7 +1672,7 @@ export function useRoomSession(
           },
         })
         .catch(() => undefined);
-      const poster = await capturePoster(stream);
+      const poster = await captureStartupSnapshot(stream);
       if (mediaMode === "wtn") {
         await wtnScreenPublishQueueRef.current;
         wtnScreenPublishersRef.current = await publishWtnScreenStreams(
@@ -1678,7 +1681,7 @@ export function useRoomSession(
         );
       }
       localStreamRef.current = stream;
-      localPosterRef.current = poster;
+      localSnapshotRef.current = poster;
       setLocalStream(stream);
       setParticipants((current) =>
         current.map((participant) =>
@@ -1716,7 +1719,7 @@ export function useRoomSession(
     const stream = localStreamRef.current;
     if (stream) for (const track of stream.getTracks()) track.stop();
     localStreamRef.current = null;
-    localPosterRef.current = null;
+    localSnapshotRef.current = null;
     setLocalStream(null);
     setParticipants((current) =>
       current.map((participant) =>

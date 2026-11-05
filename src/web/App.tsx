@@ -424,7 +424,7 @@ function Lobby({
           <div>
             <b>共享很轻，加入很快</b>
             <p>
-              未聚焦的画面只显示首帧；悬浮用低码率预览，点击后才切换到高清流。
+              未聚焦的画面保留最近一帧；悬浮用低码率预览，点击后才切换到高清流。
             </p>
           </div>
         </div>
@@ -798,6 +798,23 @@ function EmptyTile({ participant, isSelf }: { participant: Participant; isSelf: 
   );
 }
 
+interface CachedVideoFrame {
+  shareKey: string;
+  dataUrl: string;
+}
+
+const LAST_FRAME_WIDTH = 640;
+const lastFrameCache = new Map<string, CachedVideoFrame>();
+const lastFrameCaptureHandlers = new Map<string, () => void>();
+
+function shareFrameKey(participantId: string, share: ActiveShare | null): string {
+  return share ? `${participantId}:${share.startedAt}` : participantId;
+}
+
+function captureLastFrameFor(participantId: string) {
+  lastFrameCaptureHandlers.get(participantId)?.();
+}
+
 function VideoTile({
   participant,
   share,
@@ -825,10 +842,19 @@ function VideoTile({
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const tileRef = useRef<HTMLDivElement>(null);
+  const frameCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const frameKey = shareFrameKey(participant.id, share);
+  const cachedFrame = lastFrameCache.get(participant.id);
   const [hovered, setHovered] = useState(false);
   const [hasVideoFrame, setHasVideoFrame] = useState(false);
+  const [lastFrame, setLastFrame] = useState<CachedVideoFrame | null>(
+    cachedFrame?.shareKey === frameKey ? cachedFrame : null,
+  );
   const active = Boolean(stream) && (isSelf || focused || hovered);
-  const showPoster = Boolean(share?.poster) && (!hasVideoFrame || (!active && !isSelf));
+  const activeLastFrame =
+    lastFrame?.shareKey === frameKey ? lastFrame.dataUrl : null;
+  const showLastFrame = Boolean(activeLastFrame) && (!active || !hasVideoFrame);
+  const showFramePlaceholder = !activeLastFrame && !active;
   const hdConfirmed = confirmedQuality === "hd";
   const resolutionLabel =
     share?.settings.resolution === "1080p" ? "1920×1080" : "1280×720";
@@ -842,11 +868,51 @@ function VideoTile({
         ? confirmedQuality === "low"
           ? "轻量预览 · 300 Kbps 上限"
           : "正在建立轻量预览"
-        : "首帧";
+        : activeLastFrame
+          ? "最近画面 · 静止"
+          : "正在获取最近画面";
+
+  const captureFrame = () => {
+    const video = videoRef.current;
+    if (
+      !video ||
+      video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA ||
+      !video.videoWidth ||
+      !video.videoHeight
+    ) {
+      return null;
+    }
+    let canvas = frameCanvasRef.current;
+    if (!canvas) {
+      canvas = document.createElement("canvas");
+      frameCanvasRef.current = canvas;
+    }
+    const width = Math.min(LAST_FRAME_WIDTH, video.videoWidth);
+    const height = Math.max(
+      1,
+      Math.round((width / video.videoWidth) * video.videoHeight),
+    );
+    if (canvas.width !== width) canvas.width = width;
+    if (canvas.height !== height) canvas.height = height;
+    const context = canvas.getContext("2d");
+    if (!context) return null;
+    context.drawImage(video, 0, 0, width, height);
+    const nextFrame = {
+      shareKey: frameKey,
+      dataUrl: canvas.toDataURL("image/jpeg", 0.68),
+    };
+    lastFrameCache.set(participant.id, nextFrame);
+    return nextFrame;
+  };
 
   useEffect(() => {
     setHasVideoFrame(false);
   }, [stream]);
+
+  useEffect(() => {
+    const cached = lastFrameCache.get(participant.id);
+    setLastFrame(cached?.shareKey === frameKey ? cached : null);
+  }, [frameKey, participant.id]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -868,9 +934,86 @@ function VideoTile({
   }, [stream]);
 
   useEffect(() => {
-    if (!stream) return;
-    requestQuality(participant.id, focused ? "hd" : "low");
-  }, [focused, participant.id, requestQuality, stream]);
+    if (isSelf) return;
+    if (focused) requestQuality(participant.id, "hd");
+    else if (hovered) requestQuality(participant.id, "low");
+  }, [focused, hovered, isSelf, participant.id, requestQuality]);
+
+  useEffect(() => {
+    if (
+      isSelf ||
+      focused ||
+      hovered ||
+      stream ||
+      activeLastFrame ||
+      !share
+    ) {
+      return;
+    }
+    requestQuality(participant.id, "low");
+  }, [
+    activeLastFrame,
+    focused,
+    hovered,
+    isSelf,
+    participant.id,
+    requestQuality,
+    share,
+    stream,
+  ]);
+
+  useEffect(() => {
+    if (isSelf || !stream || !active) return;
+    const timer = window.setInterval(() => {
+      const frame = captureFrame();
+      if (frame && !hovered && !focused) setLastFrame(frame);
+    }, 1000);
+    return () => {
+      window.clearInterval(timer);
+      const frame = captureFrame();
+      if (frame) setLastFrame(frame);
+    };
+  }, [active, focused, frameKey, hovered, isSelf, stream]);
+
+  useEffect(() => {
+    if (isSelf) return;
+    const capture = () => {
+      const frame = captureFrame();
+      if (frame) setLastFrame(frame);
+    };
+    lastFrameCaptureHandlers.set(participant.id, capture);
+    return () => {
+      if (lastFrameCaptureHandlers.get(participant.id) === capture) {
+        lastFrameCaptureHandlers.delete(participant.id);
+      }
+    };
+  }, [frameKey, isSelf, participant.id, stream]);
+
+  useEffect(() => {
+    if (
+      isSelf ||
+      focused ||
+      hovered ||
+      activeLastFrame ||
+      !stream ||
+      !hasVideoFrame
+    ) {
+      return;
+    }
+    const frozen = captureFrame();
+    if (!frozen) return;
+    setLastFrame(frozen);
+    releaseQuality(participant.id);
+  }, [
+    activeLastFrame,
+    focused,
+    hasVideoFrame,
+    hovered,
+    isSelf,
+    participant.id,
+    releaseQuality,
+    stream,
+  ]);
 
   const fullscreen = async () => {
     try {
@@ -878,6 +1021,15 @@ function VideoTile({
     } catch {
       // Fullscreen can be denied by an embedding browser.
     }
+  };
+
+  const leavePreview = () => {
+    if (!isSelf && !focused) {
+      const frame = captureFrame();
+      if (frame) setLastFrame(frame);
+    }
+    setHovered(false);
+    if (!focused) releaseQuality(participant.id);
   };
 
   if (!share) {
@@ -894,7 +1046,7 @@ function VideoTile({
   return (
     <div
       ref={tileRef}
-      className={`video-tile has-video ${variant} ${focused ? "focused" : ""} ${active ? "previewing" : ""} ${hasVideoFrame ? "has-frame" : ""} ${showPoster ? "show-poster" : ""}`}
+      className={`video-tile has-video ${variant} ${focused ? "focused" : ""} ${active ? "previewing" : ""} ${hasVideoFrame ? "has-frame" : ""} ${activeLastFrame ? "has-last-frame" : ""}`}
       onPointerEnter={() => {
         setHovered(true);
         if (!focused) requestQuality(participant.id, "low");
@@ -904,12 +1056,10 @@ function VideoTile({
         if (!focused) requestQuality(participant.id, "low");
       }}
       onPointerLeave={() => {
-        setHovered(false);
-        if (!focused) releaseQuality(participant.id);
+        leavePreview();
       }}
       onMouseLeave={() => {
-        setHovered(false);
-        if (!focused) releaseQuality(participant.id);
+        leavePreview();
       }}
       onClick={() => share && onFocus()}
       onDoubleClick={() => {
@@ -940,8 +1090,18 @@ function VideoTile({
           正在连接画面
         </div>
       )}
-      {showPoster && (
-        <img className="first-frame" src={share.poster} alt={`${participant.displayName}的屏幕首帧`} />
+      {showLastFrame && activeLastFrame && (
+        <img
+          className="last-frame"
+          src={activeLastFrame}
+          alt={`${participant.displayName}的最近画面`}
+        />
+      )}
+      {showFramePlaceholder && (
+        <div className="last-frame-placeholder">
+          <span className="spinner" />
+          <span>正在获取最近画面</span>
+        </div>
       )}
       {stream && active && !hasVideoFrame && (
         <div className="frame-buffering">
@@ -949,12 +1109,12 @@ function VideoTile({
           正在接收画面
         </div>
       )}
-      {!isSelf && !stream && (
+      {!isSelf && !stream && !activeLastFrame && (
         <div className="tile-name">
           <span>{participant.displayName}</span>
         </div>
       )}
-      {stream && (
+      {(stream || activeLastFrame) && (
         <>
           <div className="tile-shade" />
           <div className="tile-name">
@@ -1361,6 +1521,7 @@ function RoomView({
   useEffect(() => {
     const onKeyDown = (event: globalThis.KeyboardEvent) => {
       if (event.key === "Escape" && !document.fullscreenElement && session.focusedUserId) {
+        captureLastFrameFor(session.focusedUserId);
         session.focusShare(null);
         setStageLayout("grid");
       }
@@ -1383,6 +1544,12 @@ function RoomView({
       : session.remoteStreams[participant.id] ?? null;
 
   const selectShare = (participant: Participant) => {
+    if (
+      session.focusedUserId &&
+      session.focusedUserId !== participant.id
+    ) {
+      captureLastFrameFor(session.focusedUserId);
+    }
     session.focusShare(participant.id);
     setStageLayout("spotlight");
   };
@@ -1393,6 +1560,7 @@ function RoomView({
       if (target) session.focusShare(target.id);
       setStageLayout("spotlight");
     } else {
+      if (session.focusedUserId) captureLastFrameFor(session.focusedUserId);
       session.focusShare(null);
       setStageLayout("grid");
     }
@@ -1500,7 +1668,7 @@ function RoomView({
               </span>
               <span className="eyebrow">READY TO SHARE</span>
               <h3>还没有人共享屏幕</h3>
-              <p>共享一个窗口或完整屏幕，房间里的朋友会立即看到首帧。</p>
+              <p>共享一个窗口或完整屏幕，房间里的朋友会看到最新画面。</p>
               <div className="stage-empty-people">
                 {session.participants.map((participant) => (
                   <Avatar participant={participant} small key={participant.id} />
