@@ -1,7 +1,8 @@
 import type { RawData, WebSocket } from "ws";
 import {
   ROOM_DEFINITIONS,
-  SHARE_RESOLUTION_DETAILS,
+  mediaModeAllowedForTier,
+  shareSettingsAllowedForTier,
   type ActiveShare,
   type ChatMessage,
   type ClientEvent,
@@ -50,19 +51,6 @@ function send(socket: WebSocket, event: ServerEvent) {
   }
 }
 
-function validSettings(settings: ShareSettings): boolean {
-  return (
-    [15, 30, 60].includes(settings.frameRate) &&
-    Number.isFinite(settings.bitrateKbps) &&
-    settings.bitrateKbps >= 300 &&
-    settings.bitrateKbps <= 30_000 &&
-    Object.prototype.hasOwnProperty.call(
-      SHARE_RESOLUTION_DETAILS,
-      settings.resolution,
-    )
-  );
-}
-
 export class RoomHub {
   private readonly connections = new Map<string, Connection>();
   private readonly members = new Map<RoomId, Map<string, RoomMember>>();
@@ -73,7 +61,13 @@ export class RoomHub {
     for (const room of ROOM_DEFINITIONS) {
       this.members.set(room.id, new Map());
       this.shares.set(room.id, new Map());
-      this.mediaModes.set(room.id, initialModes[room.id] ?? "p2p");
+      const requestedMode = initialModes[room.id] ?? "p2p";
+      this.mediaModes.set(
+        room.id,
+        mediaModeAllowedForTier(room.tier, requestedMode)
+          ? requestedMode
+          : "p2p",
+      );
     }
   }
 
@@ -84,6 +78,7 @@ export class RoomHub {
         id: room.id,
         name: room.name,
         capacity: room.capacity,
+        tier: room.tier,
         occupants,
         available: occupants < room.capacity,
         mediaMode: this.mediaModes.get(room.id) ?? "p2p",
@@ -91,8 +86,11 @@ export class RoomHub {
     });
   }
 
-  setRoomMediaMode(roomId: RoomId, mode: MediaMode) {
+  setRoomMediaMode(roomId: RoomId, mode: MediaMode): boolean {
+    const room = roomDefinition(roomId);
+    if (!room || !mediaModeAllowedForTier(room.tier, mode)) return false;
     this.mediaModes.set(roomId, mode);
+    return true;
   }
 
   roomIdForUser(userId: string): RoomId | null {
@@ -307,7 +305,8 @@ export class RoomHub {
     poster: string,
     settings: ShareSettings,
   ) {
-    if (!validSettings(settings)) {
+    const room = roomDefinition(roomId);
+    if (!room || !shareSettingsAllowedForTier(room.tier, settings)) {
       send(connection.socket, { type: "room.error", message: "投屏参数不合法" });
       return;
     }
@@ -339,7 +338,8 @@ export class RoomHub {
   }
 
   private updateShare(connection: Connection, roomId: RoomId, settings: ShareSettings) {
-    if (!validSettings(settings)) {
+    const room = roomDefinition(roomId);
+    if (!room || !shareSettingsAllowedForTier(room.tier, settings)) {
       send(connection.socket, { type: "room.error", message: "投屏参数不合法" });
       return;
     }
@@ -455,6 +455,7 @@ export class RoomHub {
       id: roomId,
       name: "",
       capacity: 0,
+      tier: roomDefinition(roomId)?.tier ?? "normal",
       occupants: 0,
       available: false,
       mediaMode: this.mediaModes.get(roomId) ?? "p2p",

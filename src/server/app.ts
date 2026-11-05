@@ -11,7 +11,10 @@ import type {
   WtnMediaKind,
   WtnStreamQuality,
 } from "../shared/types.js";
-import { ROOM_DEFINITIONS } from "../shared/types.js";
+import {
+  ROOM_DEFINITIONS,
+  mediaModeAllowedForTier,
+} from "../shared/types.js";
 import {
   getRequestUser,
   hashPassword,
@@ -386,8 +389,13 @@ export async function buildApp() {
     if (summary.occupants > 0) {
       return reply.code(409).send({ error: "请等待房间内用户离开后再切换媒体模式" });
     }
+    if (!mediaModeAllowedForTier(summary.tier, mode)) {
+      return reply.code(409).send({ error: "当前房间等级不允许使用该媒体线路" });
+    }
     database.setRoomMediaMode(roomId, mode);
-    rooms.setRoomMediaMode(roomId, mode);
+    if (!rooms.setRoomMediaMode(roomId, mode)) {
+      return reply.code(409).send({ error: "当前房间等级不允许使用该媒体线路" });
+    }
     return {
       room: rooms.roomSummaries().find((room) => room.id === roomId),
     };

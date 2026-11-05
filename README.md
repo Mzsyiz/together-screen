@@ -33,6 +33,7 @@ The project is currently an **MVP / 0.x** application. Desktop Chrome and Edge a
 
 - One room each for 2, 3, 4, 5 and 6 participants.
 - Administrators can select P2P/TURN or Volcengine WTN independently for each room.
+- Rooms are grouped into Normal, Advanced and Ultimate cost tiers, with server-enforced transport and quality ceilings.
 - An account can be active in only one room at a time.
 - Each user can share one screen at a time.
 - Multiple users can share screens simultaneously.
@@ -51,6 +52,16 @@ The project is currently an **MVP / 0.x** application. Desktop Chrome and Edge a
 - Grid, spotlight, secondary-share strip and fullscreen layouts.
 - Switching tiles or returning from HD keeps the latest frame visible during negotiation, then resumes the lightweight live preview.
 - Screen audio is supported when the operating system and browser expose it.
+
+### Room cost tiers
+
+| Tier | Rooms | Allowed transport | Maximum quality | Maximum HD bitrate |
+| --- | --- | --- | --- | --- |
+| Normal | 2-3 participants | Self-hosted P2P/TURN only | 720p | 3 Mbps |
+| Advanced | 4-5 participants | Self-hosted or Volcengine WTN | 2K/1440p | 15 Mbps |
+| Ultimate | 6 participants | Self-hosted or Volcengine WTN | 4K/2160p | 30 Mbps |
+
+Normal rooms remain self-hosted even if a client modifies requests; WTN and higher quality cannot bypass the server limit. Administrators still choose whether an Advanced or Ultimate room uses WTN while it is empty.
 
 ### Voice chat
 

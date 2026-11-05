@@ -40,12 +40,15 @@ describe("room hub", () => {
   });
 
   it("stores an independent media mode for each room", () => {
-    const hub = new RoomHub({ "room-2": "wtn" });
-    expect(hub.roomSummaries()[0].mediaMode).toBe("wtn");
-    expect(hub.roomSummaries()[1].mediaMode).toBe("p2p");
+    const hub = new RoomHub({ "room-2": "wtn", "room-4": "wtn" });
+    expect(hub.roomSummaries()[0].mediaMode).toBe("p2p");
+    expect(hub.roomSummaries()[2].mediaMode).toBe("wtn");
+    expect(hub.roomSummaries()[3].mediaMode).toBe("p2p");
 
-    hub.setRoomMediaMode("room-3", "wtn");
-    expect(hub.roomSummaries()[1].mediaMode).toBe("wtn");
+    expect(hub.setRoomMediaMode("room-2", "wtn")).toBe(false);
+    expect(hub.setRoomMediaMode("room-5", "wtn")).toBe(true);
+    expect(hub.roomSummaries()[0].mediaMode).toBe("p2p");
+    expect(hub.roomSummaries()[3].mediaMode).toBe("wtn");
   });
 
   it("allows only one screen share per user and relays starts to others", () => {
@@ -63,7 +66,7 @@ describe("room hub", () => {
     const event = {
       type: "share.started",
       poster: "data:image/jpeg;base64,AAAA",
-      settings: { frameRate: 30, bitrateKbps: 4000, resolution: "1080p" },
+      settings: { frameRate: 30, bitrateKbps: 3000, resolution: "720p" },
     };
     firstSocket.emit("message", JSON.stringify(event));
     firstSocket.emit("message", JSON.stringify(event));
@@ -80,11 +83,11 @@ describe("room hub", () => {
     hub.attach(user("bob"), observer as unknown as WebSocket);
     socket.emit(
       "message",
-      JSON.stringify({ type: "room.join", roomId: "room-2" }),
+      JSON.stringify({ type: "room.join", roomId: "room-6" }),
     );
     observer.emit(
       "message",
-      JSON.stringify({ type: "room.join", roomId: "room-2" }),
+      JSON.stringify({ type: "room.join", roomId: "room-6" }),
     );
     socket.sent.length = 0;
     observer.sent.length = 0;

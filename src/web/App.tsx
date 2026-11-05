@@ -9,7 +9,12 @@ import {
   useRef,
   useState,
 } from "react";
-import { SHARE_RESOLUTION_DETAILS } from "../shared/types";
+import {
+  ROOM_TIER_DETAILS,
+  SHARE_RESOLUTION_DETAILS,
+  mediaModeAllowedForTier,
+  shareSettingsAllowedForTier,
+} from "../shared/types";
 import type {
   ActiveShare,
   ChatMessage,
@@ -17,7 +22,9 @@ import type {
   PublicUser,
   QualityLevel,
   RoomSummary,
+  RoomTier,
   ShareSettings,
+  ShareResolution,
 } from "../shared/types";
 import { api, ApiError } from "./api";
 import { useRoomSession } from "./useRoomSession";
@@ -363,14 +370,38 @@ function Lobby({
         </div>
 
         {error && <p className="inline-alert">{error}</p>}
-        <div className="room-grid">
-          {rooms.map((room, index) => (
+        {(Object.keys(ROOM_TIER_DETAILS) as RoomTier[]).map((tierId) => {
+          const tier = ROOM_TIER_DETAILS[tierId];
+          const tierRooms = rooms.filter((room) => room.tier === tierId);
+          if (!tierRooms.length) return null;
+          return (
+            <section
+              className={`tier-section tier-section-${tierId}`}
+              key={tierId}
+            >
+              <header className="tier-heading">
+                <div>
+                  <span className={`tier-chip tier-chip-${tierId}`}>
+                    {tier.name}
+                  </span>
+                  <h2>{tier.name}房间</h2>
+                </div>
+                <p>{tier.description}</p>
+              </header>
+              <div className="room-grid">
+                {tierRooms.map((room) => {
+                  const index = rooms.findIndex(
+                    (candidate) => candidate.id === room.id,
+                  );
+                  return (
             <article
-              className={`room-card room-tone-${index + 1} ${room.available ? "" : "full"}`}
+              className={`room-card room-tone-${index + 1} tier-card-${tierId} ${room.available ? "" : "full"}`}
               key={room.id}
             >
               <div className="room-card-head">
-                <span className="room-capacity">{room.capacity} 人房</span>
+                <span className="room-capacity">
+                  {tier.name} · {room.capacity} 人房
+                </span>
                 <span className={`room-status ${room.available ? "" : "is-full"}`}>
                   <i />
                   {room.available ? "可加入" : "已满"}
@@ -415,8 +446,12 @@ function Lobby({
                 </small>
               </div>
             </article>
-          ))}
-        </div>
+                  );
+                })}
+              </div>
+            </section>
+          );
+        })}
 
         <div className="lobby-tip">
           <div className="tip-icon">
@@ -442,13 +477,16 @@ function SettingsMenu({
   settings,
   sharing,
   mediaMode,
+  roomTier,
   onChange,
 }: {
   settings: ShareSettings;
   sharing: boolean;
   mediaMode: RoomSummary["mediaMode"];
+  roomTier: RoomTier;
   onChange: (settings: ShareSettings) => void;
 }) {
+  const tier = ROOM_TIER_DETAILS[roomTier];
   const presets: Array<{
     id: string;
     label: string;
@@ -498,7 +536,22 @@ function SettingsMenu({
       settings: { resolution: "1080p", frameRate: 60, bitrateKbps: 10_000 },
     },
   ];
-  const activePreset = presets.find(
+  const availablePresets = presets.filter((preset) =>
+    shareSettingsAllowedForTier(roomTier, preset.settings),
+  );
+  const availableResolutions = (
+    Object.keys(SHARE_RESOLUTION_DETAILS) as ShareResolution[]
+  ).filter((resolution) => {
+    if (resolution === "source") return tier.allowNativeSource;
+    const details = SHARE_RESOLUTION_DETAILS[resolution];
+    return (
+      details.width !== null &&
+      details.height !== null &&
+      details.width <= tier.maxWidth &&
+      details.height <= tier.maxHeight
+    );
+  });
+  const activePreset = availablePresets.find(
     (preset) =>
       preset.settings.resolution === settings.resolution &&
       preset.settings.frameRate === settings.frameRate &&
@@ -513,7 +566,7 @@ function SettingsMenu({
       </summary>
       <div className="settings-popover">
         <div className="popover-title">
-          <b>画质设置</b>
+          <b>{tier.name}房 · 画质设置</b>
           <span>
             {sharing
               ? mediaMode === "wtn"
@@ -522,8 +575,12 @@ function SettingsMenu({
               : "下次共享生效"}
           </span>
         </div>
+        <p className="tier-limit-note">
+          {tier.description}
+          <small>低码率预览固定约 300 Kbps</small>
+        </p>
         <div className="quality-presets">
-          {presets.map((preset) => (
+          {availablePresets.map((preset) => (
             <button
               key={preset.id}
               type="button"
@@ -546,11 +603,13 @@ function SettingsMenu({
               })
             }
           >
-            <option value="720p">720p · 1280×720</option>
-            <option value="1080p">1080p · 1920×1080</option>
-            <option value="1440p">2K / 1440p · 2560×1440</option>
-            <option value="2160p">4K / 2160p · 3840×2160</option>
-            <option value="source">跟随屏幕原始分辨率</option>
+            {availableResolutions.map((resolution) => (
+              <option value={resolution} key={resolution}>
+                {resolution === "source"
+                  ? "跟随屏幕 · 最高 4K"
+                  : `${resolution === "1440p" ? "2K / " : resolution === "2160p" ? "4K / " : ""}${resolution} · ${SHARE_RESOLUTION_DETAILS[resolution].display}`}
+              </option>
+            ))}
           </select>
         </label>
         <label>
@@ -574,7 +633,7 @@ function SettingsMenu({
           <input
             type="range"
             min="1000"
-            max="30000"
+            max={tier.maxBitrateKbps}
             step="500"
             value={settings.bitrateKbps}
             onChange={(event) =>
@@ -582,7 +641,8 @@ function SettingsMenu({
             }
           />
           <small>
-            高清流码率上限。实际清晰度还取决于屏幕源、浏览器编码能力和接收端解码能力。
+            {tier.name}房高清码率最高 {tier.maxBitrateKbps / 1000} Mbps。
+            实际清晰度还取决于屏幕源和浏览器编码能力。
           </small>
         </label>
       </div>
@@ -1546,7 +1606,8 @@ function RoomView({
           <div className="room-title">
             <b>{room.name}</b>
             <span>
-              {session.participants.length}/{room.capacity} 人 ·{" "}
+              {ROOM_TIER_DETAILS[room.tier].name} · {session.participants.length}/
+              {room.capacity} 人 ·{" "}
               {room.mediaMode === "wtn" ? "火山 WTN" : "自建 P2P"}
             </span>
           </div>
@@ -1776,6 +1837,7 @@ function RoomView({
               settings={session.settings}
               sharing={Boolean(session.localStream)}
               mediaMode={session.mediaMode}
+              roomTier={room.tier}
               onChange={(settings) => void session.updateSettings(settings)}
             />
             <VoiceSettingsMenu
@@ -1962,10 +2024,10 @@ function AdminDialog({ onClose }: { onClose: () => void }) {
             </button>
             <div className="admin-room-modes">
               <div>
-                <h3>房间媒体线路</h3>
+                <h3>房间等级与媒体线路</h3>
                 <span>
                   {wtnEnabled
-                    ? "可为每个房间选择火山 WTN"
+                    ? "普通房固定自建；高级和极致房可选 WTN"
                     : "配置 WTN_APP_ID / WTN_APP_KEY 后可选择火山"}
                 </span>
               </div>
@@ -1973,7 +2035,9 @@ function AdminDialog({ onClose }: { onClose: () => void }) {
                 <label key={room.id}>
                   <span>
                     {room.name}
-                    <small>{room.occupants} 人在线</small>
+                    <small>
+                      {ROOM_TIER_DETAILS[room.tier].name} · {room.occupants} 人在线
+                    </small>
                   </span>
                   <select
                     value={room.mediaMode}
@@ -1986,7 +2050,13 @@ function AdminDialog({ onClose }: { onClose: () => void }) {
                     }
                   >
                     <option value="p2p">自建 P2P / TURN</option>
-                    <option value="wtn" disabled={!wtnEnabled}>
+                    <option
+                      value="wtn"
+                      disabled={
+                        !wtnEnabled ||
+                        !mediaModeAllowedForTier(room.tier, "wtn")
+                      }
+                    >
                       火山引擎 WTN
                     </option>
                   </select>

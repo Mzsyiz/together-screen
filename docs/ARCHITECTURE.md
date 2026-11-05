@@ -61,6 +61,16 @@ Each fixed room stores a persistent `mediaMode`:
 
 Only an administrator can change the mode, and only while the room is empty. This avoids tearing down active media unexpectedly.
 
+Every room also has a fixed cost tier:
+
+| Tier | Capacity | Allowed transport | Maximum quality and bitrate |
+| --- | --- | --- | --- |
+| Normal | 2-3 participants | P2P/TURN only | 720p / 3 Mbps |
+| Advanced | 4-5 participants | P2P/TURN or WTN | 1440p / 15 Mbps |
+| Ultimate | 6 participants | P2P/TURN or WTN | 2160p / 30 Mbps |
+
+Tier limits are enforced by the server. A Normal room rejects manually crafted WTN or high-quality requests.
+
 ### Volcengine WTN path
 
 WTN rooms publish screen preview, screen HD and voice as three independent streams:

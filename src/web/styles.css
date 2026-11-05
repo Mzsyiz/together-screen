@@ -684,6 +684,80 @@ select:focus {
   margin-top: 2.5rem;
 }
 
+.tier-section {
+  margin-top: 2.4rem;
+}
+
+.tier-section + .tier-section {
+  margin-top: 3rem;
+}
+
+.tier-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.tier-heading > div {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.tier-heading h2 {
+  margin: 0;
+  color: var(--cream);
+  font-size: 1rem;
+}
+
+.tier-heading p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+
+.tier-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.22rem 0.48rem;
+  border-radius: 999px;
+  font-size: 0.55rem;
+  font-weight: 700;
+}
+
+.tier-chip-normal {
+  color: #9fc3ff;
+  background: rgba(117, 166, 255, 0.12);
+}
+
+.tier-chip-advanced {
+  color: #e0acff;
+  background: rgba(209, 136, 255, 0.12);
+}
+
+.tier-chip-ultimate {
+  color: #ffd299;
+  background: rgba(255, 181, 114, 0.13);
+}
+
+.tier-section .room-grid {
+  margin-top: 1rem;
+}
+
+.tier-section-normal .room-grid,
+.tier-section-advanced .room-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.tier-section-ultimate .room-grid {
+  grid-template-columns: minmax(0, 360px);
+}
+
+.tier-card-ultimate {
+  border-color: rgba(255, 181, 114, 0.24);
+}
+
 .room-card {
   position: relative;
   min-height: 340px;
@@ -1125,6 +1199,21 @@ select:focus {
 .popover-title span {
   color: var(--muted);
   font-size: 0.6rem;
+}
+
+.tier-limit-note {
+  display: grid;
+  gap: 0.18rem;
+  margin: -0.35rem 0 0;
+  padding: 0.55rem 0.65rem;
+  border-radius: 8px;
+  color: var(--muted-strong);
+  background: rgba(255, 255, 255, 0.035);
+  font-size: 0.62rem;
+}
+
+.tier-limit-note small {
+  font-size: 0.54rem;
 }
 
 .quality-presets {
@@ -2713,12 +2802,22 @@ select:focus {
     grid-template-columns: 1fr 1fr;
   }
 
+  .tier-section .room-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .tier-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
   .room-card {
     min-height: 280px;
   }
 
   .room-card:last-child {
-    grid-column: span 2;
+    grid-column: auto;
   }
 
   .lobby-footer {

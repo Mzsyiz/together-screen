@@ -66,7 +66,12 @@ interface RemoteVoiceAnalyser {
 
 function resolutionConstraints(resolution: ShareSettings["resolution"]) {
   const details = SHARE_RESOLUTION_DETAILS[resolution];
-  if (details.width === null || details.height === null) return {};
+  if (details.width === null || details.height === null) {
+    return {
+      width: { max: 3840 },
+      height: { max: 2160 },
+    };
+  }
   return {
     width: { ideal: details.width, max: details.width },
     height: { ideal: details.height, max: details.height },

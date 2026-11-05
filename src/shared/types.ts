@@ -1,11 +1,12 @@
 export const ROOM_DEFINITIONS = [
-  { id: "room-2", name: "双人房", capacity: 2 },
-  { id: "room-3", name: "三人房", capacity: 3 },
-  { id: "room-4", name: "四人房", capacity: 4 },
-  { id: "room-5", name: "五人房", capacity: 5 },
-  { id: "room-6", name: "六人房", capacity: 6 },
+  { id: "room-2", name: "双人房", capacity: 2, tier: "normal" },
+  { id: "room-3", name: "三人房", capacity: 3, tier: "normal" },
+  { id: "room-4", name: "四人房", capacity: 4, tier: "advanced" },
+  { id: "room-5", name: "五人房", capacity: 5, tier: "advanced" },
+  { id: "room-6", name: "六人房", capacity: 6, tier: "ultimate" },
 ] as const;
 
+export type RoomTier = (typeof ROOM_DEFINITIONS)[number]["tier"];
 export type RoomId = (typeof ROOM_DEFINITIONS)[number]["id"];
 export type MediaMode = "p2p" | "wtn";
 export type WtnMediaKind = "screen" | "voice";
@@ -41,6 +42,67 @@ export const SHARE_RESOLUTION_DETAILS = {
 
 export type ShareResolution = keyof typeof SHARE_RESOLUTION_DETAILS;
 
+export const ROOM_TIER_DETAILS = {
+  normal: {
+    name: "普通",
+    description: "自建线路 · 最高 720p · 3 Mbps",
+    mediaModes: ["p2p"] as const,
+    maxWidth: 1280,
+    maxHeight: 720,
+    maxBitrateKbps: 3_000,
+    allowNativeSource: false,
+  },
+  advanced: {
+    name: "高级",
+    description: "自建或 WTN · 最高 2K · 15 Mbps",
+    mediaModes: ["p2p", "wtn"] as const,
+    maxWidth: 2560,
+    maxHeight: 1440,
+    maxBitrateKbps: 15_000,
+    allowNativeSource: false,
+  },
+  ultimate: {
+    name: "极致",
+    description: "自建或 WTN · 最高 4K · 30 Mbps",
+    mediaModes: ["p2p", "wtn"] as const,
+    maxWidth: 3840,
+    maxHeight: 2160,
+    maxBitrateKbps: 30_000,
+    allowNativeSource: true,
+  },
+} as const;
+
+export function mediaModeAllowedForTier(
+  tier: RoomTier,
+  mode: MediaMode,
+): boolean {
+  return (ROOM_TIER_DETAILS[tier].mediaModes as readonly MediaMode[]).includes(
+    mode,
+  );
+}
+
+export function shareSettingsAllowedForTier(
+  tier: RoomTier,
+  settings: ShareSettings,
+): boolean {
+  const tierDetails = ROOM_TIER_DETAILS[tier];
+  const resolution = SHARE_RESOLUTION_DETAILS[settings.resolution];
+  if (!resolution) return false;
+  if (settings.resolution === "source" && !tierDetails.allowNativeSource) {
+    return false;
+  }
+  const height = resolution.height ?? tierDetails.maxHeight;
+  const width = resolution.width ?? tierDetails.maxWidth;
+  return (
+    [15, 30, 60].includes(settings.frameRate) &&
+    Number.isFinite(settings.bitrateKbps) &&
+    settings.bitrateKbps >= 300 &&
+    settings.bitrateKbps <= tierDetails.maxBitrateKbps &&
+    height <= tierDetails.maxHeight &&
+    width <= tierDetails.maxWidth
+  );
+}
+
 export interface PublicUser {
   id: string;
   username: string;
@@ -52,6 +114,7 @@ export interface RoomSummary {
   id: RoomId;
   name: string;
   capacity: number;
+  tier: RoomTier;
   occupants: number;
   available: boolean;
   mediaMode: MediaMode;
