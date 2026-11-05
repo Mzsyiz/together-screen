@@ -89,6 +89,6 @@ export function createWtnResource(
   }
 
   const rid = input.rid ?? "low";
-  url.searchParams.set("RID", rid);
+  url.searchParams.set("RID", rid === "high" ? "High" : "Low");
   return { url: url.toString(), token, streamId, rid };
 }

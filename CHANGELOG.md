@@ -22,6 +22,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - Settings popovers now escape the bottom control bar clipping context.
 - Docker configuration now forwards TURN shared-secret and proxy/session settings.
 
+### Fixed
+
+- Deferred P2P `setParameters()` until negotiation completes.
+- Removed unsupported WTN `sendEncodings.priority` fields for Chromium compatibility.
+- Used WTN-compatible `Low`/`High` RID values and added a no-RID subscription fallback.
+- Made full error details visible, selectable and copyable above every room control.
+
 ### Security
 
 - Runtime diagnostics, private deployment notes and release archives are ignored by Git and Docker.

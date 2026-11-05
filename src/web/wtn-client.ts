@@ -18,6 +18,7 @@ export interface WtnSubscription {
   streamId: string;
   resourceUrl: string;
   rid: "low" | "high";
+  supportsRid: boolean;
   updateRid: (rid: "low" | "high") => Promise<void>;
   close: () => Promise<void>;
 }
@@ -25,17 +26,44 @@ export interface WtnSubscription {
 async function exchangeSdp(
   pc: RTCPeerConnection,
   resource: { url: string; token: string },
-): Promise<string> {
+  allowRidFallback = false,
+): Promise<{ resourceUrl: string; ridFallback: boolean }> {
   const offer = await pc.createOffer();
   await pc.setLocalDescription(offer);
-  const response = await fetch(resource.url, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${resource.token}`,
-      "Content-Type": "application/sdp",
-    },
-    body: offer.sdp ?? "",
-  });
+  const send = async (url: string): Promise<Response> => {
+    try {
+      return await fetch(url, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${resource.token}`,
+          "Content-Type": "application/sdp",
+        },
+        body: offer.sdp ?? "",
+        signal: AbortSignal.timeout(12_000),
+      });
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "TimeoutError") {
+        throw new Error("火山 WTN 信令超时，请检查网络和 WTN 配置");
+      }
+      throw error;
+    }
+  };
+
+  let response = await send(resource.url);
+  let ridFallback = false;
+  if (!response.ok && allowRidFallback) {
+    const detail = await response.clone().text().catch(() => "");
+    const fallbackUrl = new URL(resource.url);
+    if (
+      response.status === 400 &&
+      /invalid rid/i.test(detail) &&
+      fallbackUrl.searchParams.has("RID")
+    ) {
+      fallbackUrl.searchParams.delete("RID");
+      response = await send(fallbackUrl.toString());
+      ridFallback = response.ok;
+    }
+  }
   if (!response.ok) {
     const detail = await response.text().catch(() => "");
     throw new Error(
@@ -46,7 +74,10 @@ async function exchangeSdp(
   if (!location) throw new Error("火山 WTN 未返回资源地址");
   const answer = await response.text();
   await pc.setRemoteDescription({ type: "answer", sdp: answer });
-  return new URL(location, resource.url).toString();
+  return {
+    resourceUrl: new URL(location, resource.url).toString(),
+    ridFallback,
+  };
 }
 
 async function deleteResource(
@@ -85,24 +116,23 @@ export async function publishToWtn(
         streams: [media],
         sendEncodings: [
           {
-            rid: "low",
+          rid: "Low",
             scaleResolutionDownBy: lowScale,
             maxBitrate: 300_000,
             maxFramerate: 15,
-            priority: "low",
           },
           {
-            rid: "high",
+          rid: "High",
             scaleResolutionDownBy: 1,
             maxBitrate: settings.bitrateKbps * 1000,
             maxFramerate: settings.frameRate,
-            priority: "high",
           },
         ],
       });
     }
 
-    const resourceUrl = await exchangeSdp(pc, resource);
+    const exchange = await exchangeSdp(pc, resource);
+    const resourceUrl = exchange.resourceUrl;
     return {
       pc,
       streamId: resource.streamId,
@@ -129,6 +159,7 @@ export async function subscribeToWtn(
 
   let mediaTimeout: number | null = null;
   let resourceUrl: string;
+  let supportsRid = true;
   try {
     pc.ontrack = (event) => {
       if (!stream.getTracks().some((track) => track.id === event.track.id)) {
@@ -142,7 +173,9 @@ export async function subscribeToWtn(
       pc.addTransceiver("video", { direction: "recvonly" });
     }
 
-    resourceUrl = await exchangeSdp(pc, resource);
+    const exchange = await exchangeSdp(pc, resource, true);
+    resourceUrl = exchange.resourceUrl;
+    supportsRid = !exchange.ridFallback;
     await Promise.race([
       mediaReady,
       new Promise<never>((_, reject) => {
@@ -161,12 +194,14 @@ export async function subscribeToWtn(
   const activeResourceUrl = resourceUrl;
 
   const updateRid = async (rid: "low" | "high") => {
+    if (!supportsRid) return;
     const response = await fetch(activeResourceUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ RID: rid }),
+      body: JSON.stringify({ RID: rid === "high" ? "High" : "Low" }),
+      signal: AbortSignal.timeout(10_000),
     });
     if (!response.ok) {
       throw new Error(`火山 WTN 画质切换失败 (${response.status})`);
@@ -178,7 +213,8 @@ export async function subscribeToWtn(
     stream,
     streamId: resource.streamId,
     resourceUrl: activeResourceUrl,
-    rid: resource.rid,
+    rid: supportsRid ? resource.rid : "high",
+    supportsRid,
     updateRid,
     close: () => deleteResource(pc, activeResourceUrl),
   };

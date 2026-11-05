@@ -1247,6 +1247,40 @@ function VoiceAudioStream({
   return <audio ref={audioRef} autoPlay playsInline muted={muted} className="voice-audio-element" />;
 }
 
+function NoticeToast({
+  message,
+  onClose,
+}: {
+  message: string;
+  onClose: () => void;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(message);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch {
+      setCopied(false);
+    }
+  };
+
+  return (
+    <div className="toast" role="alert">
+      <span>{message}</span>
+      <div className="toast-actions">
+        <button type="button" onClick={() => void copy()}>
+          {copied ? "已复制" : "复制"}
+        </button>
+        <button type="button" aria-label="关闭错误提示" onClick={onClose}>
+          <Icon name="close" size={15} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function RoomView({
   user,
   room,
@@ -1656,10 +1690,10 @@ function RoomView({
       </div>
 
       {session.notice && (
-        <button className="toast" onClick={session.clearNotice}>
-          {session.notice}
-          <Icon name="close" size={15} />
-        </button>
+        <NoticeToast
+          message={session.notice}
+          onClose={session.clearNotice}
+        />
       )}
     </main>
   );

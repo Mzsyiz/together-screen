@@ -32,6 +32,10 @@ const SHARE_STOP_REMOVE_MS = 500;
 interface OutgoingPeer {
   pc: RTCPeerConnection;
   quality: QualityLevel;
+  pendingQualityAck?: {
+    to: string;
+    quality: QualityLevel;
+  };
 }
 
 interface VoiceOutgoingPeer {
@@ -115,6 +119,7 @@ async function applySenderQuality(
   quality: QualityLevel,
   settings: ShareSettings,
 ): Promise<boolean> {
+  if (!pc.remoteDescription || pc.connectionState === "closed") return false;
   const sender = pc.getSenders().find((candidate) => candidate.track?.kind === "video");
   if (!sender) return false;
   const parameters = sender.getParameters();
@@ -570,6 +575,16 @@ export function useRoomSession(
             closeWtnScreenSubscription(ownerId);
             return;
           }
+          if (!activeSubscription.supportsRid) {
+            setConfirmedQuality((current) => ({
+              ...current,
+              [ownerId]: "hd",
+            }));
+            setNotice(
+              "当前 WTN 应用未返回 Low/High RID，已使用默认高质量订阅",
+            );
+            return;
+          }
           const latestRid = latest === "hd" ? "high" : "low";
           if (activeSubscription.rid !== latestRid) {
             try {
@@ -728,9 +743,6 @@ export function useRoomSession(
           streams: [stream],
         });
         if (track.kind === "video") track.contentHint = "detail";
-        if (track.kind === "video") {
-          void applySenderQuality(pc, "low", settingsRef.current);
-        }
         transceiver.sender.track?.addEventListener("ended", () => pc.close());
       }
 
@@ -752,7 +764,24 @@ export function useRoomSession(
           const timer = outgoingRetryTimersRef.current.get(viewerId);
           if (timer) window.clearTimeout(timer);
           outgoingRetryTimersRef.current.delete(viewerId);
-          void applySenderQuality(pc, outgoing.quality, settingsRef.current);
+          void applySenderQuality(
+            pc,
+            outgoing.quality,
+            settingsRef.current,
+          ).then((applied) => {
+            const pending = outgoing.pendingQualityAck;
+            if (!pending || outgoingRef.current.get(viewerId) !== outgoing) {
+              return;
+            }
+            outgoing.pendingQualityAck = undefined;
+            if (applied) outgoing.quality = pending.quality;
+            send({
+              type: "quality.ack",
+              to: pending.to,
+              quality: pending.quality,
+              applied,
+            });
+          });
           return;
         }
         if (pc.connectionState === "failed" || pc.connectionState === "disconnected") {
@@ -1355,6 +1384,17 @@ export function useRoomSession(
         case "quality.request": {
           const outgoing = outgoingRef.current.get(event.from);
           if (outgoing) {
+            if (
+              !outgoing.pc.remoteDescription ||
+              outgoing.pc.connectionState !== "connected"
+            ) {
+              outgoing.quality = event.quality;
+              outgoing.pendingQualityAck = {
+                to: event.from,
+                quality: event.quality,
+              };
+              break;
+            }
             void (async () => {
               const applied = await applySenderQuality(
                 outgoing.pc,

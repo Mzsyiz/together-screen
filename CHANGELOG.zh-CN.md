@@ -22,6 +22,13 @@
 - 设置弹层不再被底部控制栏裁切。
 - Docker 配置支持 TURN 共享密钥、代理和会话设置。
 
+### 修复
+
+- P2P 连接协商完成前不再调用 `setParameters()`。
+- 移除 Chromium WTN 不支持的 `sendEncodings.priority` 字段。
+- WTN 使用兼容的 `Low` / `High` RID，并增加不带 RID 的订阅回退。
+- 完整错误信息固定显示在所有房间控件上方，并支持选择与复制。
+
 ### 安全
 
 - Git 和 Docker 忽略运行诊断、私有部署笔记和发布压缩包。

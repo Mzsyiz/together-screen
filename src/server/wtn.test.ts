@@ -73,7 +73,7 @@ describe("WTN helpers", () => {
     expect(subscribe.url).toContain("/sub/app123/room3_user123_screen");
     expect(subscribe.url).toContain("BusinessID=together-screen");
     expect(subscribe.url).toContain("ClientID=client-2");
-    expect(subscribe.url).toContain("RID=high");
+    expect(subscribe.url).toContain("RID=High");
     expect(publish.token).not.toBe(subscribe.token);
   });
 });
