@@ -1,0 +1,11 @@
+node_modules
+dist
+data
+.git
+.env*
+!.env.example
+.DS_Store
+*.log
+test
+备注.md
+together-screen-server.tar.gz

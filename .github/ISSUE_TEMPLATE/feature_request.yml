@@ -1,0 +1,43 @@
+name: Feature request
+description: Suggest a product or engineering improvement
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What user problem should this solve?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the desired behavior and alternatives considered.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Screen sharing
+        - Voice
+        - Chat
+        - Rooms and accounts
+        - Deployment
+        - Documentation
+        - Accessibility
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: tradeoffs
+    attributes:
+      label: Tradeoffs
+      description: Consider bandwidth, browser support, privacy, deployment complexity and maintenance.

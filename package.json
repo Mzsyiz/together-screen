@@ -1,0 +1,61 @@
+{
+  "name": "together-screen",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Self-hosted WebRTC screen-sharing rooms with voice chat for small groups.",
+  "license": "MIT",
+  "author": "Together Screen contributors",
+  "keywords": [
+    "webrtc",
+    "screen-sharing",
+    "video-conferencing",
+    "voice-chat",
+    "self-hosted",
+    "react",
+    "fastify",
+    "typescript"
+  ],
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -k -n server,web -c cyan,magenta \"npm:dev:server\" \"npm:dev:web\"",
+    "dev:server": "tsx watch src/server/index.ts",
+    "dev:web": "vite",
+    "build": "vite build && tsc -p tsconfig.server.json",
+    "start": "NODE_ENV=production node dist/backend/server/index.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "check": "npm run typecheck && npm test && npm run build",
+    "user:add": "tsx src/server/cli/add-user.ts",
+    "user:add:prod": "node dist/backend/server/cli/add-user.js",
+    "user:list": "tsx src/server/cli/list-users.ts",
+    "user:list:prod": "node dist/backend/server/cli/list-users.js"
+  },
+  "dependencies": {
+    "@fastify/cookie": "^11.1.5",
+    "@fastify/static": "^10.1.8",
+    "@fastify/websocket": "^11.3.6",
+    "fastify": "^5.12.8",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@types/ws": "^8.18.2",
+    "@vitejs/plugin-react": "^6.2.1",
+    "concurrently": "^10.0.6",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "vite": "^8.3.5",
+    "vitest": "^5.1.0"
+  },
+  "overrides": {
+    "glob": "^14.0.3",
+    "minimatch": "^11.0.4"
+  },
+  "engines": {
+    "node": ">=22.13"
+  }
+}

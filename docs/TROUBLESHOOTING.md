@@ -1,0 +1,142 @@
+# Troubleshooting
+
+English | [简体中文](TROUBLESHOOTING.zh-CN.md)
+
+## Cannot open the site or log in
+
+Check the Node service:
+
+```bash
+curl http://127.0.0.1:3000/api/health
+systemctl status together-screen
+```
+
+Check:
+
+- `APP_ORIGIN` exactly matches scheme, host and port;
+- HTTPS certificate is valid;
+- `COOKIE_SECURE=true` is used only with HTTPS;
+- the reverse proxy forwards `/api` and `/ws`;
+- `TRUST_PROXY=true` when running behind Nginx or Baota.
+
+## Login succeeds but rooms are unavailable
+
+An account can have only one active browser client. Logging in from another browser, tab or device invalidates the previous page. Refresh the old page and log in again if necessary.
+
+## Screen sharing is unavailable
+
+`getDisplayMedia()` requires a secure context. Use:
+
+- `https://` in production;
+- `http://localhost` for local development.
+
+Recommend desktop Chrome or Edge.
+
+## Remote video is black
+
+The current client keeps WebRTC video playing while idle and covers it with a poster. If video still turns black:
+
+1. Hover the tile to reveal the live preview.
+2. Check whether the sender still shows “Stopping share” incorrectly.
+3. Check browser console and `chrome://webrtc-internals`.
+4. Verify that the shared window still exists and is not protected content.
+5. Test with another browser or window source.
+
+Do not upload a raw WebRTC dump publicly; it may contain IP addresses and network metadata.
+
+## Video is blurry
+
+Check the quality state:
+
+- “First frame” means only the poster is visible.
+- “Preview” is intentionally low bitrate and about 360p.
+- “HD” appears only after the sharer confirms sender parameters.
+
+If the card says “Switching to HD” for too long, the sender may not support the requested encoding parameters or the browser may be under load.
+
+Static desktop content produces low measured bitrate because the encoder compresses unchanged frames efficiently. Test motion or gaming content separately before buying more bandwidth.
+
+## Video is delayed or stutters
+
+Possible causes:
+
+- sender upload bandwidth;
+- TURN relay throughput;
+- Wi-Fi packet loss;
+- browser encoding load;
+- too many simultaneous high-quality shares.
+
+Try:
+
+- lower the resolution or use the省带宽 preset;
+- request HD for one share at a time;
+- close other tabs using video capture;
+- use a wired connection;
+- verify TURN relay ports and egress limits.
+
+## Voice cannot join
+
+Check browser permissions:
+
+1. Click the site icon in the address bar.
+2. Allow microphone access.
+3. Ensure another application is not exclusively using the microphone.
+4. Refresh after changing OS-level microphone permissions.
+
+Use HTTPS. Microphone capture is blocked in insecure contexts outside localhost.
+
+## Voice connects but no sound
+
+Check:
+
+- the room-sound button is not muted;
+- “Voice output volume” is above zero;
+- the remote participant is not muted;
+- the browser output device is correct;
+- remote audio is not blocked by OS application volume settings.
+
+The voice settings panel shows participant connection state and speaking indicators.
+
+## P2P fails
+
+If ICE remains disconnected in restrictive networks, configure TURN. Public STUN only discovers addresses; it does not relay media.
+
+Verify:
+
+```bash
+ss -lunpt | grep 3478
+turnutils_stunclient turn.example.com
+```
+
+Also verify that UDP relay ports are allowed by both the OS firewall and the cloud security group.
+
+## Settings popovers do not appear
+
+Hard refresh after upgrading:
+
+```text
+Ctrl + Shift + R
+```
+
+The settings popovers must escape the bottom control bar's clipping context. Older cached CSS may continue to hide them.
+
+## SQLite errors
+
+- Ensure `DATA_DIR` exists and is writable by the service user.
+- Do not run two application instances against the same SQLite directory.
+- Back up `app.sqlite`, `app.sqlite-wal` and `app.sqlite-shm` together.
+- Restore with the service stopped.
+
+## Diagnostic guidance
+
+For WebRTC issues, useful information includes:
+
+- browser and version;
+- number of room participants;
+- direct P2P or TURN relay;
+- RTT, packet loss, jitter, freeze count and codec;
+- whether the content is static or moving;
+- selected resolution, FPS and bitrate;
+- server region and whether TURN is used.
+
+Redact public IPs, private IPs, cookies, account names and TURN credentials before posting diagnostics.
