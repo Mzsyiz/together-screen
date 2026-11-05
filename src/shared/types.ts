@@ -11,6 +11,36 @@ export type MediaMode = "p2p" | "wtn";
 export type WtnMediaKind = "screen" | "voice";
 export type WtnStreamQuality = "preview" | "hd";
 
+export const SHARE_RESOLUTION_DETAILS = {
+  "720p": {
+    width: 1280,
+    height: 720,
+    display: "1280×720",
+  },
+  "1080p": {
+    width: 1920,
+    height: 1080,
+    display: "1920×1080",
+  },
+  "1440p": {
+    width: 2560,
+    height: 1440,
+    display: "2560×1440",
+  },
+  "2160p": {
+    width: 3840,
+    height: 2160,
+    display: "3840×2160",
+  },
+  source: {
+    width: null,
+    height: null,
+    display: "跟随屏幕",
+  },
+} as const;
+
+export type ShareResolution = keyof typeof SHARE_RESOLUTION_DETAILS;
+
 export interface PublicUser {
   id: string;
   username: string;
@@ -37,7 +67,7 @@ export interface Participant extends PublicUser {
 export interface ShareSettings {
   frameRate: number;
   bitrateKbps: number;
-  resolution: "720p" | "1080p" | "source";
+  resolution: ShareResolution;
 }
 
 export interface ActiveShare {

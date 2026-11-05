@@ -9,6 +9,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { SHARE_RESOLUTION_DETAILS } from "../shared/types";
 import type {
   ActiveShare,
   ChatMessage,
@@ -455,28 +456,46 @@ function SettingsMenu({
     settings: ShareSettings;
   }> = [
     {
-      id: "clarity",
-      label: "清晰优先",
-      description: "1080p · 30 FPS · 5 Mbps",
-      settings: { resolution: "1080p", frameRate: 30, bitrateKbps: 5000 },
-    },
-    {
-      id: "balanced",
-      label: "平衡",
-      description: "720p · 30 FPS · 3 Mbps",
-      settings: { resolution: "720p", frameRate: 30, bitrateKbps: 3000 },
-    },
-    {
-      id: "motion",
-      label: "流畅优先",
-      description: "720p · 60 FPS · 5 Mbps",
-      settings: { resolution: "720p", frameRate: 60, bitrateKbps: 5000 },
-    },
-    {
       id: "data",
       label: "省带宽",
       description: "720p · 30 FPS · 1.8 Mbps",
       settings: { resolution: "720p", frameRate: 30, bitrateKbps: 1800 },
+    },
+    {
+      id: "balanced",
+      label: "均衡",
+      description: "720p · 30 FPS · 3 Mbps",
+      settings: { resolution: "720p", frameRate: 30, bitrateKbps: 3000 },
+    },
+    {
+      id: "clarity",
+      label: "高清",
+      description: "1080p · 30 FPS · 5 Mbps",
+      settings: { resolution: "1080p", frameRate: 30, bitrateKbps: 5000 },
+    },
+    {
+      id: "ultra",
+      label: "超清",
+      description: "1440p · 30 FPS · 10 Mbps",
+      settings: { resolution: "1440p", frameRate: 30, bitrateKbps: 10_000 },
+    },
+    {
+      id: "2k-high",
+      label: "2K 高码率",
+      description: "1440p · 60 FPS · 15 Mbps",
+      settings: { resolution: "1440p", frameRate: 60, bitrateKbps: 15_000 },
+    },
+    {
+      id: "4k",
+      label: "4K 极清",
+      description: "2160p · 30 FPS · 24 Mbps",
+      settings: { resolution: "2160p", frameRate: 30, bitrateKbps: 24_000 },
+    },
+    {
+      id: "motion",
+      label: "游戏高帧率",
+      description: "1080p · 60 FPS · 10 Mbps",
+      settings: { resolution: "1080p", frameRate: 60, bitrateKbps: 10_000 },
     },
   ];
   const activePreset = presets.find(
@@ -527,9 +546,11 @@ function SettingsMenu({
               })
             }
           >
-            <option value="720p">720p</option>
-            <option value="1080p">1080p</option>
-            <option value="source">跟随屏幕</option>
+            <option value="720p">720p · 1280×720</option>
+            <option value="1080p">1080p · 1920×1080</option>
+            <option value="1440p">2K / 1440p · 2560×1440</option>
+            <option value="2160p">4K / 2160p · 3840×2160</option>
+            <option value="source">跟随屏幕原始分辨率</option>
           </select>
         </label>
         <label>
@@ -553,14 +574,16 @@ function SettingsMenu({
           <input
             type="range"
             min="1000"
-            max="12000"
+            max="30000"
             step="500"
             value={settings.bitrateKbps}
             onChange={(event) =>
               onChange({ ...settings, bitrateKbps: Number(event.target.value) })
             }
           />
-          <small>未聚焦时固定使用约 300 Kbps 预览码率</small>
+          <small>
+            高清流码率上限。实际清晰度还取决于屏幕源、浏览器编码能力和接收端解码能力。
+          </small>
         </label>
       </div>
     </details>
@@ -853,13 +876,21 @@ function VideoTile({
   const showLastFrame = Boolean(activeLastFrame) && !hasVideoFrame;
   const showFramePlaceholder = !activeLastFrame && !stream;
   const hdConfirmed = confirmedQuality === "hd";
-  const resolutionLabel =
-    share?.settings.resolution === "1080p" ? "1920×1080" : "1280×720";
+  const resolution = share?.settings.resolution ?? "720p";
+  const resolutionLabel = SHARE_RESOLUTION_DETAILS[resolution].display;
+  const resolutionName =
+    resolution === "1440p"
+      ? "2K"
+      : resolution === "2160p"
+        ? "4K"
+        : resolution === "source"
+          ? "原始分辨率"
+          : resolution;
   const qualityLabel = isSelf
-    ? `本机共享 · ${share?.settings.resolution ?? "720p"}`
+    ? `本机共享 · ${resolutionName} · ${resolutionLabel}`
     : focused
       ? hdConfirmed
-        ? `高清 · ${(share?.settings.bitrateKbps ?? 3000) / 1000} Mbps 上限 · ${resolutionLabel}`
+        ? `高清 · ${resolutionName} · ${(share?.settings.bitrateKbps ?? 3000) / 1000} Mbps 上限`
         : "正在切换高清"
       : confirmedQuality === "low"
         ? "轻量预览 · 自动播放"

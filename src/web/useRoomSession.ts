@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { SHARE_RESOLUTION_DETAILS } from "../shared/types";
 import type {
   ActiveShare,
   ChatMessage,
@@ -64,19 +65,12 @@ interface RemoteVoiceAnalyser {
 }
 
 function resolutionConstraints(resolution: ShareSettings["resolution"]) {
-  if (resolution === "720p") {
-    return {
-      width: { ideal: 1280, max: 1280 },
-      height: { ideal: 720, max: 720 },
-    };
-  }
-  if (resolution === "1080p") {
-    return {
-      width: { ideal: 1920, max: 1920 },
-      height: { ideal: 1080, max: 1080 },
-    };
-  }
-  return {};
+  const details = SHARE_RESOLUTION_DETAILS[resolution];
+  if (details.width === null || details.height === null) return {};
+  return {
+    width: { ideal: details.width, max: details.width },
+    height: { ideal: details.height, max: details.height },
+  };
 }
 
 async function captureStartupSnapshot(stream: MediaStream): Promise<string> {
@@ -136,7 +130,7 @@ async function applySenderQuality(
   const sourceHeight = sender.track?.getSettings().height ?? 720;
   const previewScale = Math.max(
     1,
-    Math.min(6, Math.round(sourceHeight / 360)),
+    Math.min(12, Math.round(sourceHeight / 360)),
   );
   parameters.encodings[0].maxBitrate =
     quality === "hd" ? settings.bitrateKbps * 1000 : PREVIEW_BITRATE;

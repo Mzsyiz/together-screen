@@ -72,6 +72,50 @@ describe("room hub", () => {
     expect(firstSocket.sent.filter((message) => message.type === "room.error")).toHaveLength(1);
   });
 
+  it("accepts 4K settings up to the 30 Mbps ceiling and rejects higher bitrates", () => {
+    const hub = new RoomHub();
+    const socket = new FakeSocket();
+    const observer = new FakeSocket();
+    hub.attach(user("alice"), socket as unknown as WebSocket);
+    hub.attach(user("bob"), observer as unknown as WebSocket);
+    socket.emit(
+      "message",
+      JSON.stringify({ type: "room.join", roomId: "room-2" }),
+    );
+    observer.emit(
+      "message",
+      JSON.stringify({ type: "room.join", roomId: "room-2" }),
+    );
+    socket.sent.length = 0;
+    observer.sent.length = 0;
+
+    socket.emit(
+      "message",
+      JSON.stringify({
+        type: "share.started",
+        poster: "data:image/jpeg;base64,AAAA",
+        settings: { frameRate: 60, bitrateKbps: 30_000, resolution: "2160p" },
+      }),
+    );
+    expect(
+      observer.sent.some((message) => message.type === "share.started"),
+    ).toBe(true);
+
+    observer.sent.length = 0;
+    observer.emit(
+      "message",
+      JSON.stringify({
+        type: "share.started",
+        poster: "data:image/jpeg;base64,AAAA",
+        settings: { frameRate: 60, bitrateKbps: 30_500, resolution: "2160p" },
+      }),
+    );
+    expect(observer.sent).toContainEqual({
+      type: "room.error",
+      message: "投屏参数不合法",
+    });
+  });
+
   it("rejects an extra participant when a capacity room is full", () => {
     const hub = new RoomHub();
     const sockets = Array.from({ length: 3 }, () => new FakeSocket());

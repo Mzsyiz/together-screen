@@ -46,7 +46,8 @@ The project is currently an **MVP / 0.x** application. Desktop Chrome and Edge a
 - Every remote share starts its lightweight live preview automatically after entry, without hover or click.
 - The latest decoded frame is a transition fallback only and never freezes a healthy preview.
 - P2P confirms sender encoding changes; WTN subscribes to an independently published HD stream.
-- Capture dimensions are constrained to 720p or 1080p according to the selected preset.
+- Supports 720p, 1080p, 2K/1440p, 4K/2160p and native source resolution.
+- The HD bitrate ceiling is now 30 Mbps, allowing WTN to republish at 2K or 4K.
 - Grid, spotlight, secondary-share strip and fullscreen layouts.
 - Switching tiles or returning from HD keeps the latest frame visible during negotiation, then resumes the lightweight live preview.
 - Screen audio is supported when the operating system and browser expose it.
@@ -172,11 +173,17 @@ Only one browser client can be active for an account. Signing in from a new brow
 | Preview | About 300 Kbps, 15 FPS, about 360p | Starts automatically and resumes after leaving HD |
 | Latest frame | Last decoded frame | Used only during connect, switch or reconnect fallback |
 | HD | 720p, 30 FPS, up to 3 Mbps | Shown after click and sender confirmation |
-| Clarity | 1080p, 30 FPS, up to 5 Mbps | Text, code and static detail |
-| Motion | 720p, 60 FPS, up to 5 Mbps | Games and fast movement |
 | Data Saver | 720p, 30 FPS, up to 1.8 Mbps | Constrained networks |
+| Balanced | 720p, 30 FPS, up to 3 Mbps | Compatibility first |
+| HD | 1080p, 30 FPS, up to 5 Mbps | Text, code and regular desktop |
+| Ultra | 2K/1440p, 30 FPS, up to 10 Mbps | Large displays and detailed content |
+| 2K high bitrate | 2K/1440p, 60 FPS, up to 15 Mbps | High-DPI screens and motion |
+| 4K Ultra | 4K/2160p, 30 FPS, up to 24 Mbps | Requires a 4K source and sufficient upload |
+| Gaming | 1080p, 60 FPS, up to 10 Mbps | Games and fast movement |
 
 Bitrate values are caps. Encoder behavior, content movement and congestion control determine actual usage.
+
+With WTN, 4K still depends on a 4K capture source, browser encoding support and viewer decoding capability. In P2P rooms, 2K/4K significantly increases sharer upload; reserve the highest modes for the content that needs them.
 
 ## Configuration
 

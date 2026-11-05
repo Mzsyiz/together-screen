@@ -1,6 +1,7 @@
 import type { RawData, WebSocket } from "ws";
 import {
   ROOM_DEFINITIONS,
+  SHARE_RESOLUTION_DETAILS,
   type ActiveShare,
   type ChatMessage,
   type ClientEvent,
@@ -54,8 +55,11 @@ function validSettings(settings: ShareSettings): boolean {
     [15, 30, 60].includes(settings.frameRate) &&
     Number.isFinite(settings.bitrateKbps) &&
     settings.bitrateKbps >= 300 &&
-    settings.bitrateKbps <= 20_000 &&
-    ["720p", "1080p", "source"].includes(settings.resolution)
+    settings.bitrateKbps <= 30_000 &&
+    Object.prototype.hasOwnProperty.call(
+      SHARE_RESOLUTION_DETAILS,
+      settings.resolution,
+    )
   );
 }
 

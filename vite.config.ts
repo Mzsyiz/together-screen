@@ -27,6 +27,6 @@ export default defineConfig({
   test: {
     root: fileURLToPath(new URL(".", import.meta.url)),
     environment: "node",
-    include: ["src/server/**/*.test.ts"],
+    include: ["src/server/**/*.test.ts", "src/web/**/*.test.ts"],
   },
 });

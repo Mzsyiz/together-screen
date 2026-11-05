@@ -71,7 +71,7 @@ screen HD:      <room>_<user>_screen_hd_<unique>
 voice:          <room>_<user>_voice_<unique>
 ```
 
-The publishing browser creates two WHIP-style `RTCPeerConnection` instances for the screen: a preview stream at roughly 360p / 15 FPS / 300 Kbps and an HD stream using the room's configured resolution, frame rate and bitrate. Preview does not depend on simulcast RIDs, so the WTN application does not need to expose RID switching. Viewers automatically subscribe to and continuously play a preview for every visible share. A click replaces preview with an independent HD subscription. Moving focus or leaving HD re-subscribes preview; the cached latest frame is only a negotiation-time fallback.
+The publishing browser creates two WHIP-style `RTCPeerConnection` instances for the screen: a preview stream at roughly 360p / 15 FPS / 300 Kbps and an HD stream using the room's configured resolution, frame rate and bitrate. HD supports 720p, 1080p, 2K/1440p, 4K/2160p and native source resolution, with a 30 Mbps bitrate ceiling. Preview does not depend on simulcast RIDs, so the WTN application does not need to expose RID switching. Viewers automatically subscribe to and continuously play a preview for every visible share. A click replaces preview with an independent HD subscription. Moving focus or leaving HD re-subscribes preview; the cached latest frame is only a negotiation-time fallback.
 
 The second stream adds roughly 300 Kbps to the sharer's upload, but makes preview and HD deterministic by using separate StreamIDs instead of a per-stream layer selector. Screen system audio is published with the HD stream only; microphone voice remains a separate voice stream.
 

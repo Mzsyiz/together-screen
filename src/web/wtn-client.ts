@@ -1,3 +1,4 @@
+import { SHARE_RESOLUTION_DETAILS } from "../shared/types";
 import type {
   ShareSettings,
   WtnMediaKind,
@@ -20,6 +21,22 @@ export interface WtnSubscription {
   resourceUrl: string;
   quality: WtnStreamQuality;
   close: () => Promise<void>;
+}
+
+export function wtnScreenSendEncoding(
+  quality: WtnStreamQuality | undefined,
+  settings: ShareSettings,
+  sourceHeight: number,
+) {
+  return {
+    scaleResolutionDownBy:
+      quality === "preview"
+        ? Math.max(1, Math.min(12, Math.round(sourceHeight / 360)))
+        : 1,
+    maxBitrate:
+      quality === "preview" ? 300_000 : settings.bitrateKbps * 1000,
+    maxFramerate: quality === "preview" ? 15 : settings.frameRate,
+  };
 }
 
 async function exchangeSdp(
@@ -93,22 +110,13 @@ export async function publishToWtn(
     if (kind === "screen" && video) {
       video.contentHint = "detail";
       const configuredHeight =
-        settings.resolution === "1080p" ? 1080 : 720;
-      const sourceHeight = video.getSettings().height ?? configuredHeight;
-      const previewScale =
-        quality === "preview"
-          ? Math.max(1, Math.min(6, Math.round(sourceHeight / 360)))
-          : 1;
+        SHARE_RESOLUTION_DETAILS[settings.resolution].height;
+      const sourceHeight = video.getSettings().height ?? configuredHeight ?? 1080;
       pc.addTransceiver(video, {
         direction: "sendonly",
         streams: [media],
         sendEncodings: [
-          {
-            scaleResolutionDownBy: previewScale,
-            maxBitrate:
-              quality === "preview" ? 300_000 : settings.bitrateKbps * 1000,
-            maxFramerate: quality === "preview" ? 15 : settings.frameRate,
-          },
+          wtnScreenSendEncoding(quality, settings, sourceHeight),
         ],
       });
     }
