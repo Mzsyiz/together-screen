@@ -66,6 +66,11 @@ async function exchangeSdp(
   }
   if (!response.ok) {
     const detail = await response.text().catch(() => "");
+    if (response.status === 431) {
+      throw new Error(
+        "火山 WTN 发布资源仍被占用，请停止旧共享并等待约 30 秒后重试",
+      );
+    }
     throw new Error(
       `火山 WTN 信令失败 (${response.status})${detail ? `: ${detail}` : ""}`,
     );

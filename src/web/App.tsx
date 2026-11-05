@@ -1504,9 +1504,13 @@ function RoomView({
                   <Avatar participant={participant} small key={participant.id} />
                 ))}
               </div>
-              <button className="primary-button stage-empty-action" onClick={() => void session.startShare()}>
+              <button
+                className="primary-button stage-empty-action"
+                disabled={session.shareStarting}
+                onClick={() => void session.startShare()}
+              >
                 <Icon name="screen" />
-                共享我的屏幕
+                {session.shareStarting ? "正在启动共享…" : "共享我的屏幕"}
               </button>
             </div>
           )}
@@ -1584,13 +1588,20 @@ function RoomView({
           <div className="stage-controls">
             <button
               className={`meeting-control share-control ${session.localStream ? "active" : ""}`}
+              disabled={session.shareStarting}
               onClick={() => {
                 if (session.localStream) session.stopShare();
                 else void session.startShare();
               }}
             >
               <Icon name="screen" size={19} />
-              <span>{session.localStream ? "停止共享" : "共享屏幕"}</span>
+              <span>
+                {session.localStream
+                  ? "停止共享"
+                  : session.shareStarting
+                    ? "正在启动…"
+                    : "共享屏幕"}
+              </span>
             </button>
             <button
               className={`meeting-control ${muted ? "" : "active"}`}

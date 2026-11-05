@@ -24,7 +24,10 @@ import {
 import { appConfig, iceServersForUser } from "./config.js";
 import { AppDatabase } from "./db.js";
 import { RoomHub } from "./room-hub.js";
-import { createWtnResource } from "./wtn.js";
+import {
+  createWtnPublishStreamId,
+  createWtnResource,
+} from "./wtn.js";
 
 const ROOM_IDS = new Set<string>(ROOM_DEFINITIONS.map((room) => room.id));
 function isRoomId(roomId: string): roomId is RoomId {
@@ -88,6 +91,7 @@ export async function buildApp() {
   const rooms = new RoomHub(database.getRoomMediaModes());
   const loginAttempts = new Map<string, { count: number; resetAt: number }>();
   const activeClients = new Map<string, string>();
+  const wtnStreams = new Map<string, string>();
   const app = Fastify({
     logger: appConfig.isProduction,
     bodyLimit: 2 * 1024 * 1024,
@@ -214,6 +218,8 @@ export async function buildApp() {
       if (kind !== "screen" && kind !== "voice") {
         return reply.code(400).send({ error: "媒体类型不合法" });
       }
+      const streamId = createWtnPublishStreamId(room.id, user.id, kind);
+      wtnStreams.set(`${room.id}:${user.id}:${kind}`, streamId);
       return createWtnResource({
         config: appConfig.wtn,
         action: "pub",
@@ -221,6 +227,7 @@ export async function buildApp() {
         roomId: room.id,
         ownerId: user.id,
         clientId: user.id,
+        streamId,
       });
     },
   );
@@ -257,6 +264,10 @@ export async function buildApp() {
     ) {
       return reply.code(409).send({ error: "目标媒体尚未发布" });
     }
+    const streamId = wtnStreams.get(`${room.id}:${ownerId}:${kind}`);
+    if (!streamId) {
+      return reply.code(409).send({ error: "WTN 发布资源尚未创建" });
+    }
     return createWtnResource({
       config: appConfig.wtn,
       action: "sub",
@@ -265,6 +276,7 @@ export async function buildApp() {
       ownerId,
       clientId: user.id,
       rid: request.body?.rid === "high" ? "high" : "low",
+      streamId,
     });
   });
 

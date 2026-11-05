@@ -2,6 +2,7 @@ import { createHmac } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
   createWtnResource,
+  createWtnPublishStreamId,
   createWtnStreamId,
   createWtnToken,
   type WtnServerConfig,
@@ -23,6 +24,15 @@ describe("WTN helpers", () => {
     expect(createWtnStreamId("room-6", "abc-def-123", "voice")).toBe(
       "room6_abcdef123_voice",
     );
+  });
+
+  it("creates a unique stream ID for every publish attempt", () => {
+    const first = createWtnPublishStreamId("room-4", "user-123", "screen");
+    const second = createWtnPublishStreamId("room-4", "user-123", "screen");
+    expect(first).toMatch(/^[a-zA-Z0-9_]+$/);
+    expect(first.length).toBeLessThanOrEqual(64);
+    expect(first).not.toBe(second);
+    expect(first).toContain("room4_user123_screen_");
   });
 
   it("creates an HS256 JWT with publish claims", () => {

@@ -1,4 +1,4 @@
-import { createHmac } from "node:crypto";
+import { createHmac, randomBytes } from "node:crypto";
 import type {
   RoomId,
   WtnMediaKind,
@@ -24,6 +24,7 @@ interface WtnResourceInput {
   ownerId: string;
   clientId: string;
   rid?: "low" | "high";
+  streamId?: string;
 }
 
 function base64UrlJson(value: unknown): string {
@@ -39,6 +40,16 @@ export function createWtnStreamId(
   const ownerPart = ownerId.replace(/[^a-zA-Z0-9]/g, "");
   const kindPart = kind === "screen" ? "screen" : "voice";
   return `${roomPart}_${ownerPart}_${kindPart}`.slice(0, 64);
+}
+
+export function createWtnPublishStreamId(
+  roomId: RoomId,
+  ownerId: string,
+  kind: WtnMediaKind,
+): string {
+  const base = createWtnStreamId(roomId, ownerId, kind);
+  const suffix = randomBytes(4).toString("hex");
+  return `${base.slice(0, 55)}_${suffix}`;
 }
 
 export function createWtnToken(input: {
@@ -67,7 +78,8 @@ export function createWtnToken(input: {
 export function createWtnResource(
   input: WtnResourceInput,
 ): WtnPublishResource | WtnSubscribeResource {
-  const streamId = createWtnStreamId(input.roomId, input.ownerId, input.kind);
+  const streamId =
+    input.streamId ?? createWtnStreamId(input.roomId, input.ownerId, input.kind);
   const url = new URL(
     `${input.config.apiBaseUrl.replace(/\/$/, "")}/${input.action}/${encodeURIComponent(
       input.config.appId,

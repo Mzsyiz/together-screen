@@ -198,6 +198,7 @@ export function useRoomSession(
   const [shares, setShares] = useState<Record<string, ActiveShare>>({});
   const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({});
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  const [shareStarting, setShareStarting] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [voiceMuted, setVoiceMuted] = useState(false);
   const [voiceStreams, setVoiceStreams] = useState<Record<string, MediaStream>>({});
@@ -268,6 +269,7 @@ export function useRoomSession(
   const wtnVoiceTasksRef = useRef(new Map<string, Promise<void>>());
   const reconnectTimerRef = useRef<number | null>(null);
   const stopShareRef = useRef<() => void>(() => undefined);
+  const shareStartingRef = useRef(false);
   const onSessionReplacedRef = useRef(onSessionReplaced);
 
   useEffect(() => {
@@ -1561,10 +1563,13 @@ export function useRoomSession(
   }, [closePeerMaps, closeVoiceAudioContext, handleServerEvent, roomId]);
 
   const startShare = useCallback(async () => {
+    if (shareStartingRef.current) return;
     if (!navigator.mediaDevices?.getDisplayMedia) {
       setNotice("当前浏览器不支持屏幕共享，请使用最新版 Chrome、Edge 或 Safari");
       return;
     }
+    shareStartingRef.current = true;
+    setShareStarting(true);
     let acquiredStream: MediaStream | null = null;
     try {
       const stream = await navigator.mediaDevices.getDisplayMedia({
@@ -1625,6 +1630,9 @@ export function useRoomSession(
         for (const track of acquiredStream.getTracks()) track.stop();
       }
       setNotice(error instanceof Error ? error.message : "屏幕共享启动失败");
+    } finally {
+      shareStartingRef.current = false;
+      setShareStarting(false);
     }
   }, [createOutgoingPeer, mediaMode, send, user.id]);
 
@@ -1860,6 +1868,7 @@ export function useRoomSession(
     shares,
     remoteStreams,
     localStream,
+    shareStarting,
     voiceEnabled,
     voiceMuted,
     voiceStreams,
