@@ -27,6 +27,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - Deferred P2P `setParameters()` until negotiation completes.
 - Removed unsupported WTN `sendEncodings.priority` fields for Chromium compatibility.
 - Used WTN-compatible `Low`/`High` RID values and added a no-RID subscription fallback.
+- Stopped RID retry loops when a WTN application falls back to a single default layer.
 - Made full error details visible, selectable and copyable above every room control.
 
 ### Security

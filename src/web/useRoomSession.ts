@@ -576,10 +576,11 @@ export function useRoomSession(
             return;
           }
           if (!activeSubscription.supportsRid) {
-            setConfirmedQuality((current) => ({
-              ...current,
-              [ownerId]: "hd",
-            }));
+            setConfirmedQuality((current) =>
+              current[ownerId] === "hd"
+                ? current
+                : { ...current, [ownerId]: "hd" },
+            );
             setNotice(
               "当前 WTN 应用未返回 Low/High RID，已使用默认高质量订阅",
             );
@@ -614,7 +615,12 @@ export function useRoomSession(
           wtnScreenTasksRef.current.delete(ownerId);
           const latest = wtnScreenDesiredRef.current.get(ownerId);
           const subscription = wtnScreenSubscriptionsRef.current.get(ownerId);
-          if (latest && subscription && subscription.rid !== latest) {
+          const latestRid = latest === "hd" ? "high" : "low";
+          if (
+            latest &&
+            subscription?.supportsRid &&
+            subscription.rid !== latestRid
+          ) {
             requestWtnScreenQuality(ownerId, latest);
           }
         });

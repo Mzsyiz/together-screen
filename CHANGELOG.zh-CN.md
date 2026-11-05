@@ -27,6 +27,7 @@
 - P2P 连接协商完成前不再调用 `setParameters()`。
 - 移除 Chromium WTN 不支持的 `sendEncodings.priority` 字段。
 - WTN 使用兼容的 `Low` / `High` RID，并增加不带 RID 的订阅回退。
+- WTN 回退为单一默认层后停止 RID 重试循环，避免观看端 React 状态溢出崩溃。
 - 完整错误信息固定显示在所有房间控件上方，并支持选择与复制。
 
 ### 安全
