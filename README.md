@@ -42,13 +42,13 @@ The project is currently an **MVP / 0.x** application. Desktop Chrome and Edge a
 
 - WebRTC peer-to-peer screen sharing; media does not pass through the application server by default.
 - Managed Volcengine WTN publishing and subscriptions when enabled for the room.
-- Default `720p / 30 FPS / 3 Mbps`.
-- Clarity, Balanced, Motion and Data Saver presets.
+- Default Standard: `1080p / 15 FPS / 2.5 Mbps`; Normal rooms automatically clamp it to `720p / 15 FPS / 2.5 Mbps`.
+- Users select a use case instead of arbitrarily combining resolution and frame rate.
 - Every remote share starts its lightweight live preview automatically after entry, without hover or click.
 - The latest decoded frame is a transition fallback only and never freezes a healthy preview.
 - P2P confirms sender encoding changes; WTN subscribes to an independently published HD stream.
-- Supports 720p, 1080p, 2K/1440p, 4K/2160p and native source resolution.
-- The HD bitrate ceiling is now 30 Mbps, allowing WTN to republish at 2K or 4K.
+- Standard profiles cover 720p, 1080p, 2K/1440p and 4K/2160p, with availability determined by room tier.
+- WTN republishes the selected standard profile while WebRTC congestion control adapts actual send bitrate.
 - Grid, spotlight, secondary-share strip and fullscreen layouts.
 - Switching tiles or returning from HD keeps the latest frame visible during negotiation, then resumes the lightweight live preview.
 - Screen audio is supported when the operating system and browser expose it.
@@ -185,16 +185,14 @@ Only one browser client can be active for an account. Signing in from a new brow
 | --- | --- | --- |
 | Preview | About 300 Kbps, 15 FPS, about 360p | Starts automatically and resumes after leaving HD |
 | Latest frame | Last decoded frame | Used only during connect, switch or reconnect fallback |
-| HD | 720p, 30 FPS, up to 3 Mbps | Shown after click and sender confirmation |
-| Data Saver | 720p, 30 FPS, up to 1.8 Mbps | Constrained networks |
-| Balanced | 720p, 30 FPS, up to 3 Mbps | Compatibility first |
-| HD | 1080p, 30 FPS, up to 5 Mbps | Text, code and regular desktop |
-| Ultra | 2K/1440p, 30 FPS, up to 10 Mbps | Large displays and detailed content |
-| 2K high bitrate | 2K/1440p, 60 FPS, up to 15 Mbps | High-DPI screens and motion |
-| 4K Ultra | 4K/2160p, 30 FPS, up to 24 Mbps | Requires a 4K source and sufficient upload |
-| Gaming | 1080p, 60 FPS, up to 10 Mbps | Games and fast movement |
+| Smooth | 720p, 10 FPS, 1.5 Mbps | Chat, basic browsing and constrained networks |
+| Standard | 1080p, 15 FPS, 2.5 Mbps | Default: office, web, documents and code |
+| HD | 1080p, 30 FPS, 4 Mbps | Software demos, animation and video |
+| Ultra | 2K/1440p, 30 FPS, 8 Mbps | High-resolution desktops and detailed content |
+| Gaming | 1080p, 60 FPS, 8 Mbps | Games and motion; frame rate first |
+| 4K | 4K/2160p, 30 FPS, 20 Mbps | Ultimate rooms only; requires a 4K source |
 
-Bitrate values are caps. Encoder behavior, content movement and congestion control determine actual usage.
+Bitrate values are caps. WebRTC congestion control still adapts actual bitrate from packet loss, RTT and available bandwidth. Normal rooms clamp higher modes to their allowed resolution and bitrate instead of producing invalid combinations.
 
 With WTN, 4K still depends on a 4K capture source, browser encoding support and viewer decoding capability. In P2P rooms, 2K/4K significantly increases sharer upload; reserve the highest modes for the content that needs them.
 

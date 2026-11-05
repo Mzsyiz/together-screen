@@ -56,12 +56,13 @@ If the card says “Switching to HD” for too long, the sender may not support 
 
 Static desktop content produces low measured bitrate because the encoder compresses unchanged frames efficiently. Test motion or gaming content separately before buying more bandwidth.
 
-For higher quality over WTN, start with these ranges:
+Choose a standardized WTN profile by content:
 
-- 1080p / 30 FPS: 5-8 Mbps;
-- 2K / 1440p / 30 FPS: 10-15 Mbps;
-- 4K / 2160p / 30 FPS: 20-30 Mbps;
-- gaming at 1080p / 60 FPS: 10-15 Mbps.
+- Standard for office, web, documents and code;
+- HD for software demos, animation and video;
+- Ultra for detailed 2K desktops;
+- Gaming for games and fast movement;
+- 4K for 4K presentations in Ultimate rooms only.
 
 If the badge says 4K but the image is still soft, verify that the browser capture source is actually 4K instead of an upscaled low-resolution window. In P2P rooms, 4K significantly increases the sharer's upload to every viewer; WTN is primarily limited by sharer upload and Volcengine plan limits.
 

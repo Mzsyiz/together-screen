@@ -12,8 +12,10 @@ import {
 import {
   ROOM_TIER_DETAILS,
   SHARE_RESOLUTION_DETAILS,
+  SHARE_QUALITY_MODES,
   mediaModeAllowedForTier,
-  shareSettingsAllowedForTier,
+  qualityModeAllowedForTier,
+  shareSettingsForMode,
 } from "../shared/types";
 import type {
   ActiveShare,
@@ -24,7 +26,7 @@ import type {
   RoomSummary,
   RoomTier,
   ShareSettings,
-  ShareResolution,
+  ShareQualityMode,
 } from "../shared/types";
 import { api, ApiError } from "./api";
 import { useRoomSession } from "./useRoomSession";
@@ -487,76 +489,16 @@ function SettingsMenu({
   onChange: (settings: ShareSettings) => void;
 }) {
   const tier = ROOM_TIER_DETAILS[roomTier];
-  const presets: Array<{
-    id: string;
-    label: string;
-    description: string;
-    settings: ShareSettings;
-  }> = [
-    {
-      id: "data",
-      label: "省带宽",
-      description: "720p · 30 FPS · 1.8 Mbps",
-      settings: { resolution: "720p", frameRate: 30, bitrateKbps: 1800 },
-    },
-    {
-      id: "balanced",
-      label: "均衡",
-      description: "720p · 30 FPS · 3 Mbps",
-      settings: { resolution: "720p", frameRate: 30, bitrateKbps: 3000 },
-    },
-    {
-      id: "clarity",
-      label: "高清",
-      description: "1080p · 30 FPS · 5 Mbps",
-      settings: { resolution: "1080p", frameRate: 30, bitrateKbps: 5000 },
-    },
-    {
-      id: "ultra",
-      label: "超清",
-      description: "1440p · 30 FPS · 10 Mbps",
-      settings: { resolution: "1440p", frameRate: 30, bitrateKbps: 10_000 },
-    },
-    {
-      id: "2k-high",
-      label: "2K 高码率",
-      description: "1440p · 60 FPS · 15 Mbps",
-      settings: { resolution: "1440p", frameRate: 60, bitrateKbps: 15_000 },
-    },
-    {
-      id: "4k",
-      label: "4K 极清",
-      description: "2160p · 30 FPS · 24 Mbps",
-      settings: { resolution: "2160p", frameRate: 30, bitrateKbps: 24_000 },
-    },
-    {
-      id: "motion",
-      label: "游戏高帧率",
-      description: "1080p · 60 FPS · 10 Mbps",
-      settings: { resolution: "1080p", frameRate: 60, bitrateKbps: 10_000 },
-    },
-  ];
-  const availablePresets = presets.filter((preset) =>
-    shareSettingsAllowedForTier(roomTier, preset.settings),
-  );
-  const availableResolutions = (
-    Object.keys(SHARE_RESOLUTION_DETAILS) as ShareResolution[]
-  ).filter((resolution) => {
-    if (resolution === "source") return tier.allowNativeSource;
-    const details = SHARE_RESOLUTION_DETAILS[resolution];
-    return (
-      details.width !== null &&
-      details.height !== null &&
-      details.width <= tier.maxWidth &&
-      details.height <= tier.maxHeight
-    );
-  });
-  const activePreset = availablePresets.find(
-    (preset) =>
-      preset.settings.resolution === settings.resolution &&
-      preset.settings.frameRate === settings.frameRate &&
-      preset.settings.bitrateKbps === settings.bitrateKbps,
-  );
+  const availableModes = (
+    Object.keys(SHARE_QUALITY_MODES) as ShareQualityMode[]
+  ).filter((mode) => qualityModeAllowedForTier(roomTier, mode));
+  const effectiveResolution = SHARE_RESOLUTION_DETAILS[settings.resolution];
+  const degradationLabel =
+    settings.degradationPreference === "maintain-resolution"
+      ? "优先保持清晰度"
+      : settings.degradationPreference === "maintain-framerate"
+        ? "优先保持流畅度"
+        : "清晰与流畅平衡";
 
   return (
     <details className="settings-menu">
@@ -577,74 +519,45 @@ function SettingsMenu({
         </div>
         <p className="tier-limit-note">
           {tier.description}
-          <small>低码率预览固定约 300 Kbps</small>
+          <small>选择使用场景即可，系统自动匹配分辨率、帧率和码率</small>
         </p>
         <div className="quality-presets">
-          {availablePresets.map((preset) => (
-            <button
-              key={preset.id}
-              type="button"
-              className={activePreset?.id === preset.id ? "active" : ""}
-              onClick={() => onChange(preset.settings)}
-            >
-              <b>{preset.label}</b>
-              <span>{preset.description}</span>
-            </button>
-          ))}
+          {availableModes.map((mode) => {
+            const profile = SHARE_QUALITY_MODES[mode];
+            const effective = shareSettingsForMode(roomTier, mode);
+            return (
+              <button
+                key={mode}
+                type="button"
+                className={settings.qualityMode === mode ? "active" : ""}
+                onClick={() => onChange(effective)}
+              >
+                <b>{profile.name}</b>
+                <span>{profile.description}</span>
+                <em>
+                  {SHARE_RESOLUTION_DETAILS[effective.resolution].display} ·{" "}
+                  {effective.frameRate} FPS ·{" "}
+                  {(effective.bitrateKbps / 1000).toFixed(1)} Mbps
+                </em>
+              </button>
+            );
+          })}
         </div>
-        <label>
-          分辨率
-          <select
-            value={settings.resolution}
-            onChange={(event) =>
-              onChange({
-                ...settings,
-                resolution: event.target.value as ShareSettings["resolution"],
-              })
-            }
-          >
-            {availableResolutions.map((resolution) => (
-              <option value={resolution} key={resolution}>
-                {resolution === "source"
-                  ? "跟随屏幕 · 最高 4K"
-                  : `${resolution === "1440p" ? "2K / " : resolution === "2160p" ? "4K / " : ""}${resolution} · ${SHARE_RESOLUTION_DETAILS[resolution].display}`}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          帧率
-          <select
-            value={settings.frameRate}
-            onChange={(event) =>
-              onChange({ ...settings, frameRate: Number(event.target.value) })
-            }
-          >
-            <option value={15}>15 FPS</option>
-            <option value={30}>30 FPS</option>
-            <option value={60}>60 FPS</option>
-          </select>
-        </label>
-        <label>
-          <span className="range-label">
-            高清码率
-            <b>{settings.bitrateKbps >= 1000 ? `${(settings.bitrateKbps / 1000).toFixed(1)} Mbps` : `${settings.bitrateKbps} Kbps`}</b>
-          </span>
-          <input
-            type="range"
-            min="1000"
-            max={tier.maxBitrateKbps}
-            step="500"
-            value={settings.bitrateKbps}
-            onChange={(event) =>
-              onChange({ ...settings, bitrateKbps: Number(event.target.value) })
-            }
-          />
+        <div className="quality-profile-summary">
+          <span>当前生效参数</span>
+          <b>
+            {SHARE_QUALITY_MODES[settings.qualityMode].name} ·{" "}
+            {effectiveResolution.display} · {settings.frameRate} FPS ·{" "}
+            {(settings.bitrateKbps / 1000).toFixed(1)} Mbps
+          </b>
           <small>
-            {tier.name}房高清码率最高 {tier.maxBitrateKbps / 1000} Mbps。
-            实际清晰度还取决于屏幕源和浏览器编码能力。
+            {degradationLabel} · WebRTC 会根据实际网络自动调节发送码率
           </small>
-        </label>
+        </div>
+        <p className="quality-standard-note">
+          “标准”是默认推荐：优先保持文字和界面清晰。实际编码参数仍受屏幕源、
+          浏览器性能和网络状况影响。
+        </p>
       </div>
     </details>
   );
@@ -946,11 +859,14 @@ function VideoTile({
         : resolution === "source"
           ? "原始分辨率"
           : resolution;
+  const qualityModeName = share
+    ? SHARE_QUALITY_MODES[share.settings.qualityMode].name
+    : "标准";
   const qualityLabel = isSelf
-    ? `本机共享 · ${resolutionName} · ${resolutionLabel}`
+    ? `本机共享 · ${qualityModeName} · ${resolutionName} · ${resolutionLabel}`
     : focused
       ? hdConfirmed
-        ? `高清 · ${resolutionName} · ${(share?.settings.bitrateKbps ?? 3000) / 1000} Mbps 上限`
+        ? `${qualityModeName} · ${resolutionName} · ${(share?.settings.bitrateKbps ?? 2500) / 1000} Mbps 上限`
         : "正在切换高清"
       : confirmedQuality === "low"
         ? "轻量预览 · 自动播放"
@@ -1483,6 +1399,7 @@ function RoomView({
     user,
     room.id,
     room.mediaMode,
+    room.tier,
     onSessionReplaced,
   );
   const [muted, setMuted] = useState(true);

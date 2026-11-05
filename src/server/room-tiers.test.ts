@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   ROOM_DEFINITIONS,
   mediaModeAllowedForTier,
+  shareSettingsForMode,
   shareSettingsAllowedForTier,
 } from "../shared/types.js";
 
@@ -32,24 +33,36 @@ describe("room cost tiers", () => {
     expect(mediaModeAllowedForTier("normal", "p2p")).toBe(true);
     expect(mediaModeAllowedForTier("normal", "wtn")).toBe(false);
     expect(
-      shareSettingsAllowedForTier("normal", {
-        resolution: "720p",
-        frameRate: 30,
-        bitrateKbps: 3000,
-      }),
+      shareSettingsAllowedForTier(
+        "normal",
+        shareSettingsForMode("normal", "standard"),
+      ),
     ).toBe(true);
     expect(
       shareSettingsAllowedForTier("normal", {
+        qualityMode: "standard",
         resolution: "1080p",
-        frameRate: 30,
-        bitrateKbps: 3000,
+        frameRate: 15,
+        bitrateKbps: 2500,
+        degradationPreference: "maintain-resolution",
       }),
     ).toBe(false);
     expect(
       shareSettingsAllowedForTier("normal", {
+        qualityMode: "hd",
+        resolution: "720p",
+        frameRate: 30,
+        bitrateKbps: 3000,
+        degradationPreference: "balanced",
+      }),
+    ).toBe(true);
+    expect(
+      shareSettingsAllowedForTier("normal", {
+        qualityMode: "hd",
         resolution: "720p",
         frameRate: 30,
         bitrateKbps: 3500,
+        degradationPreference: "balanced",
       }),
     ).toBe(false);
   });
@@ -58,32 +71,34 @@ describe("room cost tiers", () => {
     expect(mediaModeAllowedForTier("advanced", "wtn")).toBe(true);
     expect(
       shareSettingsAllowedForTier("advanced", {
+        qualityMode: "ultra",
         resolution: "1440p",
-        frameRate: 60,
-        bitrateKbps: 15_000,
+        frameRate: 30,
+        bitrateKbps: 8000,
+        degradationPreference: "maintain-resolution",
       }),
     ).toBe(true);
     expect(
       shareSettingsAllowedForTier("advanced", {
+        qualityMode: "fourK",
         resolution: "2160p",
         frameRate: 30,
-        bitrateKbps: 10_000,
+        bitrateKbps: 20_000,
+        degradationPreference: "maintain-resolution",
       }),
     ).toBe(false);
     expect(mediaModeAllowedForTier("ultimate", "wtn")).toBe(true);
     expect(
-      shareSettingsAllowedForTier("ultimate", {
-        resolution: "2160p",
-        frameRate: 30,
-        bitrateKbps: 30_000,
-      }),
+      shareSettingsAllowedForTier(
+        "ultimate",
+        shareSettingsForMode("ultimate", "fourK"),
+      ),
     ).toBe(true);
     expect(
-      shareSettingsAllowedForTier("ultimate", {
-        resolution: "source",
-        frameRate: 30,
-        bitrateKbps: 30_000,
-      }),
+      shareSettingsAllowedForTier(
+        "ultimate",
+        shareSettingsForMode("ultimate", "gaming"),
+      ),
     ).toBe(true);
   });
 });

@@ -70,7 +70,13 @@ describe("room hub", () => {
     const event = {
       type: "share.started",
       poster: "data:image/jpeg;base64,AAAA",
-      settings: { frameRate: 30, bitrateKbps: 3000, resolution: "720p" },
+      settings: {
+        qualityMode: "hd",
+        frameRate: 30,
+        bitrateKbps: 3000,
+        resolution: "720p",
+        degradationPreference: "balanced",
+      },
     };
     firstSocket.emit("message", JSON.stringify(event));
     firstSocket.emit("message", JSON.stringify(event));
@@ -79,7 +85,7 @@ describe("room hub", () => {
     expect(firstSocket.sent.filter((message) => message.type === "room.error")).toHaveLength(1);
   });
 
-  it("accepts 4K settings up to the 30 Mbps ceiling and rejects higher bitrates", () => {
+  it("accepts the standardized 4K profile and rejects a modified higher bitrate", () => {
     const hub = new RoomHub();
     const socket = new FakeSocket();
     const observer = new FakeSocket();
@@ -101,7 +107,13 @@ describe("room hub", () => {
       JSON.stringify({
         type: "share.started",
         poster: "data:image/jpeg;base64,AAAA",
-        settings: { frameRate: 60, bitrateKbps: 30_000, resolution: "2160p" },
+        settings: {
+          qualityMode: "fourK",
+          frameRate: 30,
+          bitrateKbps: 20_000,
+          resolution: "2160p",
+          degradationPreference: "maintain-resolution",
+        },
       }),
     );
     expect(
@@ -114,7 +126,13 @@ describe("room hub", () => {
       JSON.stringify({
         type: "share.started",
         poster: "data:image/jpeg;base64,AAAA",
-        settings: { frameRate: 60, bitrateKbps: 30_500, resolution: "2160p" },
+        settings: {
+          qualityMode: "fourK",
+          frameRate: 30,
+          bitrateKbps: 20_500,
+          resolution: "2160p",
+          degradationPreference: "maintain-resolution",
+        },
       }),
     );
     expect(observer.sent).toContainEqual({
@@ -184,7 +202,13 @@ describe("room hub", () => {
       JSON.stringify({
         type: "share.started",
         poster: "data:image/jpeg;base64,AAAA",
-        settings: { frameRate: 30, bitrateKbps: 3000, resolution: "720p" },
+        settings: {
+          qualityMode: "hd",
+          frameRate: 30,
+          bitrateKbps: 3000,
+          resolution: "720p",
+          degradationPreference: "balanced",
+        },
       }),
     );
     sharerSocket.sent.length = 0;

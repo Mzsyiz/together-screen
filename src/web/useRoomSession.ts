@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { SHARE_RESOLUTION_DETAILS } from "../shared/types";
+import {
+  SHARE_RESOLUTION_DETAILS,
+  shareSettingsForMode,
+} from "../shared/types";
 import type {
   ActiveShare,
   ChatMessage,
@@ -9,6 +12,7 @@ import type {
   PublicUser,
   QualityLevel,
   RtcIceServer,
+  RoomTier,
   ServerEvent,
   ShareSettings,
   WtnStreamQuality,
@@ -20,12 +24,6 @@ import {
   type WtnPublisher,
   type WtnSubscription,
 } from "./wtn-client";
-
-const DEFAULT_SETTINGS: ShareSettings = {
-  frameRate: 30,
-  bitrateKbps: 3000,
-  resolution: "720p",
-};
 
 const PREVIEW_BITRATE = 300_000;
 const VOICE_MAX_BITRATE = 48_000;
@@ -146,8 +144,8 @@ async function applySenderQuality(
   parameters.encodings[0].priority = quality === "hd" ? "high" : "low";
   parameters.encodings[0].networkPriority = quality === "hd" ? "high" : "low";
   parameters.degradationPreference =
-    quality === "hd" && settings.frameRate >= 60
-      ? "maintain-framerate"
+    quality === "hd"
+      ? settings.degradationPreference
       : "maintain-resolution";
   try {
     await sender.setParameters(parameters);
@@ -232,6 +230,7 @@ export function useRoomSession(
   user: PublicUser,
   roomId: Parameters<typeof api.messages>[0],
   mediaMode: MediaMode,
+  roomTier: RoomTier,
   onSessionReplaced?: () => void,
 ) {
   const [connectionState, setConnectionState] = useState<
@@ -261,7 +260,9 @@ export function useRoomSession(
   const [confirmedQuality, setConfirmedQuality] = useState<
     Record<string, QualityLevel>
   >({});
-  const [settings, setSettings] = useState<ShareSettings>(DEFAULT_SETTINGS);
+  const [settings, setSettings] = useState<ShareSettings>(() =>
+    shareSettingsForMode(roomTier, "standard"),
+  );
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [focusedUserId, setFocusedUserId] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);

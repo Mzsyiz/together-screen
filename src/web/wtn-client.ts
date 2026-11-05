@@ -125,6 +125,20 @@ export async function publishToWtn(
     }
 
     const resourceUrl = await exchangeSdp(pc, resource);
+    if (kind === "screen") {
+      const sender = pc
+        .getSenders()
+        .find((candidate) => candidate.track?.kind === "video");
+      if (sender) {
+        const parameters = sender.getParameters();
+        if (!parameters.encodings?.length) parameters.encodings = [{}];
+        parameters.degradationPreference =
+          quality === "hd"
+            ? settings.degradationPreference
+            : "maintain-resolution";
+        await sender.setParameters(parameters).catch(() => undefined);
+      }
+    }
     return {
       pc,
       streamId: resource.streamId,

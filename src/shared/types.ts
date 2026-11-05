@@ -52,6 +52,70 @@ export const SHARE_RESOLUTION_DETAILS = {
 
 export type ShareResolution = keyof typeof SHARE_RESOLUTION_DETAILS;
 
+export type ShareDegradationPreference =
+  | "maintain-resolution"
+  | "balanced"
+  | "maintain-framerate";
+
+export const SHARE_QUALITY_MODES = {
+  smooth: {
+    name: "流畅",
+    description: "聊天、普通浏览和低带宽网络",
+    resolution: "720p",
+    frameRate: 10,
+    bitrateKbps: 1_500,
+    degradationPreference: "balanced",
+    tiers: ["normal", "advanced", "ultimate"],
+  },
+  standard: {
+    name: "标准",
+    description: "办公、网页、文档和代码，默认推荐",
+    resolution: "1080p",
+    frameRate: 15,
+    bitrateKbps: 2_500,
+    degradationPreference: "maintain-resolution",
+    tiers: ["normal", "advanced", "ultimate"],
+  },
+  hd: {
+    name: "高清",
+    description: "软件演示、动画和视频播放",
+    resolution: "1080p",
+    frameRate: 30,
+    bitrateKbps: 4_000,
+    degradationPreference: "balanced",
+    tiers: ["normal", "advanced", "ultimate"],
+  },
+  ultra: {
+    name: "超清",
+    description: "高分辨率演示、精细画面和复杂桌面",
+    resolution: "1440p",
+    frameRate: 30,
+    bitrateKbps: 8_000,
+    degradationPreference: "maintain-resolution",
+    tiers: ["advanced", "ultimate"],
+  },
+  gaming: {
+    name: "游戏",
+    description: "高帧率动态画面，优先保持流畅",
+    resolution: "1080p",
+    frameRate: 60,
+    bitrateKbps: 8_000,
+    degradationPreference: "maintain-framerate",
+    tiers: ["advanced", "ultimate"],
+  },
+  fourK: {
+    name: "4K",
+    description: "4K 原始细节和高码率演示",
+    resolution: "2160p",
+    frameRate: 30,
+    bitrateKbps: 20_000,
+    degradationPreference: "maintain-resolution",
+    tiers: ["ultimate"],
+  },
+} as const;
+
+export type ShareQualityMode = keyof typeof SHARE_QUALITY_MODES;
+
 export const ROOM_TIER_DETAILS = {
   normal: {
     name: "普通",
@@ -91,12 +155,50 @@ export function mediaModeAllowedForTier(
   );
 }
 
+export function qualityModeAllowedForTier(
+  tier: RoomTier,
+  mode: ShareQualityMode,
+): boolean {
+  return (SHARE_QUALITY_MODES[mode].tiers as readonly RoomTier[]).includes(tier);
+}
+
+export function shareSettingsForMode(
+  tier: RoomTier,
+  mode: ShareQualityMode,
+): ShareSettings {
+  const profile = SHARE_QUALITY_MODES[mode];
+  const target = SHARE_RESOLUTION_DETAILS[profile.resolution];
+  const tierDetails = ROOM_TIER_DETAILS[tier];
+  const resolution: ShareResolution =
+    target.width === null ||
+    target.height === null ||
+    target.width <= tierDetails.maxWidth &&
+      target.height <= tierDetails.maxHeight
+      ? profile.resolution
+      : "720p";
+  return {
+    qualityMode: mode,
+    resolution,
+    frameRate: profile.frameRate,
+    bitrateKbps: Math.min(
+      profile.bitrateKbps,
+      tierDetails.maxBitrateKbps,
+    ),
+    degradationPreference: profile.degradationPreference,
+  };
+}
+
 export function shareSettingsAllowedForTier(
   tier: RoomTier,
   settings: ShareSettings,
 ): boolean {
   const tierDetails = ROOM_TIER_DETAILS[tier];
+  const mode = SHARE_QUALITY_MODES[settings.qualityMode];
+  if (!mode || !qualityModeAllowedForTier(tier, settings.qualityMode)) {
+    return false;
+  }
   const resolution = SHARE_RESOLUTION_DETAILS[settings.resolution];
+  const modeResolution = SHARE_RESOLUTION_DETAILS[mode.resolution];
   if (!resolution) return false;
   if (settings.resolution === "source" && !tierDetails.allowNativeSource) {
     return false;
@@ -104,10 +206,15 @@ export function shareSettingsAllowedForTier(
   const height = resolution.height ?? tierDetails.maxHeight;
   const width = resolution.width ?? tierDetails.maxWidth;
   return (
-    [15, 30, 60].includes(settings.frameRate) &&
+    [5, 10, 15, 30, 60].includes(settings.frameRate) &&
     Number.isFinite(settings.bitrateKbps) &&
     settings.bitrateKbps >= 300 &&
     settings.bitrateKbps <= tierDetails.maxBitrateKbps &&
+    settings.bitrateKbps <= mode.bitrateKbps &&
+    settings.frameRate <= mode.frameRate &&
+    settings.degradationPreference === mode.degradationPreference &&
+    height <= (modeResolution.height ?? tierDetails.maxHeight) &&
+    width <= (modeResolution.width ?? tierDetails.maxWidth) &&
     height <= tierDetails.maxHeight &&
     width <= tierDetails.maxWidth
   );
@@ -138,9 +245,11 @@ export interface Participant extends PublicUser {
 }
 
 export interface ShareSettings {
+  qualityMode: ShareQualityMode;
   frameRate: number;
   bitrateKbps: number;
   resolution: ShareResolution;
+  degradationPreference: ShareDegradationPreference;
 }
 
 export interface ActiveShare {

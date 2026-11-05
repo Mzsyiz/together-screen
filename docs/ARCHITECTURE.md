@@ -71,6 +71,19 @@ Every room also has a fixed cost tier:
 
 Tier limits are enforced by the server. A Normal room rejects manually crafted WTN or high-quality requests.
 
+The client exposes standardized usage profiles instead of arbitrary resolution, frame-rate and bitrate combinations:
+
+| Mode | Target | Encoder strategy | Intended content |
+| --- | --- | --- | --- |
+| Smooth | 720p / 10 FPS / 1.5 Mbps | Balanced | Chat, basic browsing, low bandwidth |
+| Standard | 1080p / 15 FPS / 2.5 Mbps | Resolution first | Default; office, web, documents and code |
+| HD | 1080p / 30 FPS / 4 Mbps | Balanced | Software demos, animation and video |
+| Ultra | 1440p / 30 FPS / 8 Mbps | Resolution first | High-resolution desktops and detail |
+| Gaming | 1080p / 60 FPS / 8 Mbps | Frame rate first | Games and fast movement |
+| 4K | 2160p / 30 FPS / 20 Mbps | Resolution first | Ultimate rooms only |
+
+Normal rooms clamp higher modes to the 720p / 3 Mbps ceiling. Advanced rooms expose up to Ultra and Gaming, while 4K is available only in Ultimate rooms. WebRTC congestion control continues to adapt actual send bitrate.
+
 ### Volcengine WTN path
 
 WTN rooms publish screen preview, screen HD and voice as three independent streams:
@@ -81,7 +94,7 @@ screen HD:      <room>_<user>_screen_hd_<unique>
 voice:          <room>_<user>_voice_<unique>
 ```
 
-The publishing browser creates two WHIP-style `RTCPeerConnection` instances for the screen: a preview stream at roughly 360p / 15 FPS / 300 Kbps and an HD stream using the room's configured resolution, frame rate and bitrate. HD supports 720p, 1080p, 2K/1440p, 4K/2160p and native source resolution, with a 30 Mbps bitrate ceiling. Preview does not depend on simulcast RIDs, so the WTN application does not need to expose RID switching. Viewers automatically subscribe to and continuously play a preview for every visible share. A click replaces preview with an independent HD subscription. Moving focus or leaving HD re-subscribes preview; the cached latest frame is only a negotiation-time fallback.
+The publishing browser creates two WHIP-style `RTCPeerConnection` instances for the screen: a preview stream at roughly 360p / 15 FPS / 300 Kbps and an HD stream whose resolution, frame rate, bitrate and degradation strategy come from a standardized profile. Preview does not depend on simulcast RIDs, so the WTN application does not need to expose RID switching. Viewers automatically subscribe to and continuously play a preview for every visible share. A click replaces preview with an independent HD subscription. Moving focus or leaving HD re-subscribes preview; the cached latest frame is only a negotiation-time fallback.
 
 The second stream adds roughly 300 Kbps to the sharer's upload, but makes preview and HD deterministic by using separate StreamIDs instead of a per-stream layer selector. Screen system audio is published with the HD stream only; microphone voice remains a separate voice stream.
 
