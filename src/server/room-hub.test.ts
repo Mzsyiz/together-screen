@@ -31,24 +31,28 @@ function user(id: string): PublicUser {
 }
 
 describe("room hub", () => {
-  it("creates the five fixed capacity rooms", () => {
+  it("creates all tier and capacity combinations", () => {
     const hub = new RoomHub();
-    expect(hub.roomSummaries().map((room) => room.capacity)).toEqual([2, 3, 4, 5, 6]);
+    expect(hub.roomSummaries().map((room) => room.capacity)).toEqual([
+      2, 3, 4, 5, 6,
+      2, 3, 4, 5, 6,
+      2, 3, 4, 5, 6,
+    ]);
     expect(hub.roomSummaries().every((room) => room.mediaMode === "p2p")).toBe(
       true,
     );
   });
 
   it("stores an independent media mode for each room", () => {
-    const hub = new RoomHub({ "room-2": "wtn", "room-4": "wtn" });
+    const hub = new RoomHub({ "room-2": "wtn", "advanced-2": "wtn" });
     expect(hub.roomSummaries()[0].mediaMode).toBe("p2p");
-    expect(hub.roomSummaries()[2].mediaMode).toBe("wtn");
-    expect(hub.roomSummaries()[3].mediaMode).toBe("p2p");
+    expect(hub.roomSummaries()[5].mediaMode).toBe("wtn");
+    expect(hub.roomSummaries()[6].mediaMode).toBe("p2p");
 
     expect(hub.setRoomMediaMode("room-2", "wtn")).toBe(false);
-    expect(hub.setRoomMediaMode("room-5", "wtn")).toBe(true);
+    expect(hub.setRoomMediaMode("advanced-3", "wtn")).toBe(true);
     expect(hub.roomSummaries()[0].mediaMode).toBe("p2p");
-    expect(hub.roomSummaries()[3].mediaMode).toBe("wtn");
+    expect(hub.roomSummaries()[6].mediaMode).toBe("wtn");
   });
 
   it("allows only one screen share per user and relays starts to others", () => {
@@ -83,11 +87,11 @@ describe("room hub", () => {
     hub.attach(user("bob"), observer as unknown as WebSocket);
     socket.emit(
       "message",
-      JSON.stringify({ type: "room.join", roomId: "room-6" }),
+      JSON.stringify({ type: "room.join", roomId: "ultimate-6" }),
     );
     observer.emit(
       "message",
-      JSON.stringify({ type: "room.join", roomId: "room-6" }),
+      JSON.stringify({ type: "room.join", roomId: "ultimate-6" }),
     );
     socket.sent.length = 0;
     observer.sent.length = 0;

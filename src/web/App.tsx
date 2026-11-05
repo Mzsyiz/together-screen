@@ -390,7 +390,7 @@ function Lobby({
               </header>
               <div className="room-grid">
                 {tierRooms.map((room) => {
-                  const index = rooms.findIndex(
+                  const index = tierRooms.findIndex(
                     (candidate) => candidate.id === room.id,
                   );
                   return (
@@ -1418,9 +1418,18 @@ function VoiceAudioStream({
     const audio = audioRef.current;
     if (!audio) return;
     audio.srcObject = stream;
-    audio.volume = volume;
+  }, [stream]);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (audio) audio.volume = volume;
+  }, [volume]);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio || muted) return;
     void audio.play().catch(() => undefined);
-  }, [muted, stream, volume]);
+  }, [muted, stream]);
 
   return <audio ref={audioRef} autoPlay playsInline muted={muted} className="voice-audio-element" />;
 }

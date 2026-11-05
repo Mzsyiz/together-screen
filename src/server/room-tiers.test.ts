@@ -12,9 +12,19 @@ describe("room cost tiers", () => {
     ).toEqual([
       ["room-2", "normal"],
       ["room-3", "normal"],
-      ["room-4", "advanced"],
-      ["room-5", "advanced"],
-      ["room-6", "ultimate"],
+      ["room-4", "normal"],
+      ["room-5", "normal"],
+      ["room-6", "normal"],
+      ["advanced-2", "advanced"],
+      ["advanced-3", "advanced"],
+      ["advanced-4", "advanced"],
+      ["advanced-5", "advanced"],
+      ["advanced-6", "advanced"],
+      ["ultimate-2", "ultimate"],
+      ["ultimate-3", "ultimate"],
+      ["ultimate-4", "ultimate"],
+      ["ultimate-5", "ultimate"],
+      ["ultimate-6", "ultimate"],
     ]);
   });
 

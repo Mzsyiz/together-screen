@@ -11,11 +11,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 ### Added
 
 - Per-room administrator-selected P2P/TURN or Volcengine WTN media transport.
-- Added Normal, Advanced and Ultimate cost tiers with server-enforced transport, resolution and bitrate limits.
+- Added 15 rooms covering every 2-6 capacity in Normal, Advanced and Ultimate tiers, with server-enforced transport and quality limits.
 - Server-signed short-lived WTN JWTs and browser WHIP/WHEP publishing/subscribing.
 - Complete P2P room voice controls, devices, gain, levels, output volume and speaking indicators.
 - Added 2K/1440p, 4K/2160p and native source capture resolutions.
 - Added 2K high-bitrate, 4K Ultra and gaming presets, with a 30 Mbps HD ceiling.
+- Optimized voice with Opus preference, a 48 Kbps cap, real-time priority and automatic default-microphone recovery after device loss.
 - Architecture, deployment, troubleshooting and open-source contribution documentation.
 - GitHub CI, Issue templates, Pull Request template and Dependabot configuration.
 

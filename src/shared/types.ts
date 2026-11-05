@@ -1,9 +1,19 @@
 export const ROOM_DEFINITIONS = [
-  { id: "room-2", name: "双人房", capacity: 2, tier: "normal" },
-  { id: "room-3", name: "三人房", capacity: 3, tier: "normal" },
-  { id: "room-4", name: "四人房", capacity: 4, tier: "advanced" },
-  { id: "room-5", name: "五人房", capacity: 5, tier: "advanced" },
-  { id: "room-6", name: "六人房", capacity: 6, tier: "ultimate" },
+  { id: "room-2", name: "普通双人房", capacity: 2, tier: "normal" },
+  { id: "room-3", name: "普通三人房", capacity: 3, tier: "normal" },
+  { id: "room-4", name: "普通四人房", capacity: 4, tier: "normal" },
+  { id: "room-5", name: "普通五人房", capacity: 5, tier: "normal" },
+  { id: "room-6", name: "普通六人房", capacity: 6, tier: "normal" },
+  { id: "advanced-2", name: "高级双人房", capacity: 2, tier: "advanced" },
+  { id: "advanced-3", name: "高级三人房", capacity: 3, tier: "advanced" },
+  { id: "advanced-4", name: "高级四人房", capacity: 4, tier: "advanced" },
+  { id: "advanced-5", name: "高级五人房", capacity: 5, tier: "advanced" },
+  { id: "advanced-6", name: "高级六人房", capacity: 6, tier: "advanced" },
+  { id: "ultimate-2", name: "极致双人房", capacity: 2, tier: "ultimate" },
+  { id: "ultimate-3", name: "极致三人房", capacity: 3, tier: "ultimate" },
+  { id: "ultimate-4", name: "极致四人房", capacity: 4, tier: "ultimate" },
+  { id: "ultimate-5", name: "极致五人房", capacity: 5, tier: "ultimate" },
+  { id: "ultimate-6", name: "极致六人房", capacity: 6, tier: "ultimate" },
 ] as const;
 
 export type RoomTier = (typeof ROOM_DEFINITIONS)[number]["tier"];

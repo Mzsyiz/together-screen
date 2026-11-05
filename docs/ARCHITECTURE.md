@@ -65,9 +65,9 @@ Every room also has a fixed cost tier:
 
 | Tier | Capacity | Allowed transport | Maximum quality and bitrate |
 | --- | --- | --- | --- |
-| Normal | 2-3 participants | P2P/TURN only | 720p / 3 Mbps |
-| Advanced | 4-5 participants | P2P/TURN or WTN | 1440p / 15 Mbps |
-| Ultimate | 6 participants | P2P/TURN or WTN | 2160p / 30 Mbps |
+| Normal | 2-6 participants, one room each | P2P/TURN only | 720p / 3 Mbps |
+| Advanced | 2-6 participants, one room each | P2P/TURN or WTN | 1440p / 15 Mbps |
+| Ultimate | 2-6 participants, one room each | P2P/TURN or WTN | 2160p / 30 Mbps |
 
 Tier limits are enforced by the server. A Normal room rejects manually crafted WTN or high-quality requests.
 
@@ -149,7 +149,7 @@ Voice uses the same ICE server configuration as screen sharing but a separate `R
 7. Muting disables the outgoing media tracks without tearing down the peer connections.
 8. Leaving voice closes voice peers and stops all microphone processing tracks.
 
-Audio constraints request echo cancellation, noise suppression, automatic gain control, mono capture and a 48 kHz ideal sample rate. Browser and hardware support still vary.
+Audio constraints request echo cancellation, noise suppression, automatic gain control, mono capture and a 48 kHz ideal sample rate. The sender prefers Opus, applies an approximately 48 Kbps voice bitrate cap after negotiation and marks the track with a speech content hint. If the active microphone disconnects unexpectedly, the client attempts to switch to the system default input instead of dropping the entire voice session. Browser and hardware support still vary.
 
 ## WebSocket protocol
 

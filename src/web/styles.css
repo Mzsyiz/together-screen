@@ -745,13 +745,8 @@ select:focus {
   margin-top: 1rem;
 }
 
-.tier-section-normal .room-grid,
-.tier-section-advanced .room-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.tier-section-ultimate .room-grid {
-  grid-template-columns: minmax(0, 360px);
+.tier-section .room-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
 .tier-card-ultimate {
@@ -2699,6 +2694,10 @@ select:focus {
 
 @media (max-width: 1180px) {
   .room-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .tier-section .room-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 

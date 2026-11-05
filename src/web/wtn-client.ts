@@ -100,9 +100,12 @@ export async function publishToWtn(
   try {
     const audio = media.getAudioTracks()[0];
     if (audio && (kind === "voice" || quality === "hd")) {
+      if (kind === "voice") audio.contentHint = "speech";
       pc.addTransceiver(audio, {
         direction: "sendonly",
         streams: [media],
+        sendEncodings:
+          kind === "voice" ? [{ maxBitrate: 48_000 }] : undefined,
       });
     }
 

@@ -28,6 +28,7 @@ const DEFAULT_SETTINGS: ShareSettings = {
 };
 
 const PREVIEW_BITRATE = 300_000;
+const VOICE_MAX_BITRATE = 48_000;
 const REALTIME_DISCONNECT_GRACE_MS = 3000;
 const SHARE_STOP_REMOVE_MS = 500;
 
@@ -175,6 +176,40 @@ function microphoneConstraints(deviceId: string): MediaTrackConstraints {
   };
 }
 
+function preferVoiceCodec(pc: RTCPeerConnection) {
+  if (typeof RTCRtpSender.getCapabilities !== "function") return;
+  const capabilities = RTCRtpSender.getCapabilities("audio");
+  if (!capabilities?.codecs.length) return;
+  const codecs = [
+    ...capabilities.codecs.filter((codec) => /opus/i.test(codec.mimeType)),
+    ...capabilities.codecs.filter((codec) => !/opus/i.test(codec.mimeType)),
+  ];
+  for (const transceiver of pc.getTransceivers()) {
+    try {
+      transceiver.setCodecPreferences(codecs);
+    } catch {
+      // Some embedded browsers expose RTCRtpTransceiver without codec controls.
+    }
+  }
+}
+
+async function tuneVoiceSender(pc: RTCPeerConnection) {
+  const sender = pc
+    .getSenders()
+    .find((candidate) => candidate.track?.kind === "audio");
+  if (!sender || !pc.remoteDescription || pc.connectionState === "closed") return;
+  const parameters = sender.getParameters();
+  if (!parameters.encodings?.length) parameters.encodings = [{}];
+  parameters.encodings[0].maxBitrate = VOICE_MAX_BITRATE;
+  parameters.encodings[0].networkPriority = "high";
+  parameters.encodings[0].priority = "high";
+  try {
+    await sender.setParameters(parameters);
+  } catch {
+    // Audio remains usable with browser-default sender parameters.
+  }
+}
+
 function microphoneErrorMessage(error: unknown): string {
   if (error instanceof DOMException) {
     if (error.name === "NotAllowedError" || error.name === "SecurityError") {
@@ -284,6 +319,7 @@ export function useRoomSession(
   const wtnVoiceTasksRef = useRef(new Map<string, Promise<void>>());
   const reconnectTimerRef = useRef<number | null>(null);
   const stopShareRef = useRef<() => void>(() => undefined);
+  const recoverMicrophoneRef = useRef<() => void>(() => undefined);
   const shareStartingRef = useRef(false);
   const onSessionReplacedRef = useRef(onSessionReplaced);
 
@@ -415,6 +451,7 @@ export function useRoomSession(
     async (stream: MediaStream, requestedDeviceId: string) => {
       const track = stream.getAudioTracks()[0];
       if (!track) throw new Error("没有获取到麦克风");
+      track.contentHint = "speech";
       const context = await ensureVoiceAudioContext();
       const previousStream = micStreamRef.current;
       micStreamRef.current = stream;
@@ -432,6 +469,8 @@ export function useRoomSession(
         voiceInputAnalyserRef.current = analyser;
         voiceInputDestinationRef.current = destination;
         voiceSendStreamRef.current = destination.stream;
+        const sendTrack = destination.stream.getAudioTracks()[0];
+        if (sendTrack) sendTrack.contentHint = "speech";
       }
 
       voiceInputSourceRef.current?.disconnect();
@@ -446,8 +485,8 @@ export function useRoomSession(
 
       track.addEventListener("ended", () => {
         if (micStreamRef.current === stream && voiceEnabledRef.current) {
-          setNotice("麦克风已断开，请重新选择输入设备");
-          void leaveVoiceRef.current();
+          setNotice("麦克风已断开，正在尝试切换到系统默认麦克风");
+          recoverMicrophoneRef.current();
         }
       });
 
@@ -975,10 +1014,14 @@ export function useRoomSession(
         ...current,
         [listenerId]: pc.connectionState,
       }));
-      pc.addTransceiver(micTrack, {
+      const voiceTransceiver = pc.addTransceiver(micTrack, {
         direction: "sendonly",
         streams: [voiceSendStreamRef.current ?? micStreamRef.current!],
       });
+      if (voiceTransceiver.sender.track) {
+        voiceTransceiver.sender.track.contentHint = "speech";
+      }
+      preferVoiceCodec(pc);
       pc.onicecandidate = (event) => {
         if (event.candidate) {
           send({
@@ -997,6 +1040,7 @@ export function useRoomSession(
           [listenerId]: pc.connectionState,
         }));
         if (pc.connectionState === "connected") {
+          void tuneVoiceSender(pc);
           const timer = voiceOutgoingRetryTimersRef.current.get(listenerId);
           if (timer) window.clearTimeout(timer);
           voiceOutgoingRetryTimersRef.current.delete(listenerId);
@@ -1066,6 +1110,10 @@ export function useRoomSession(
       return;
     }
     if (!voiceEnabledRef.current) {
+      for (const timer of voiceOutgoingRetryTimersRef.current.values()) {
+        window.clearTimeout(timer);
+      }
+      voiceOutgoingRetryTimersRef.current.clear();
       for (const { pc } of voiceOutgoingRef.current.values()) pc.close();
       for (const { pc } of voiceIncomingRef.current.values()) pc.close();
       voiceOutgoingRef.current.clear();
@@ -1078,6 +1126,9 @@ export function useRoomSession(
     }
     for (const peerId of voiceOutgoingRef.current.keys()) {
       if (!remoteVoiceEnabledRef.current.has(peerId)) {
+        const timer = voiceOutgoingRetryTimersRef.current.get(peerId);
+        if (timer) window.clearTimeout(timer);
+        voiceOutgoingRetryTimersRef.current.delete(peerId);
         voiceOutgoingRef.current.get(peerId)?.pc.close();
         voiceOutgoingRef.current.delete(peerId);
         setVoicePeerStates((current) => {
@@ -1238,6 +1289,9 @@ export function useRoomSession(
               incomingRef.current.get(event.userId)?.close();
               incomingRef.current.delete(event.userId);
               remoteVoiceEnabledRef.current.delete(event.userId);
+              const voiceRetry = voiceOutgoingRetryTimersRef.current.get(event.userId);
+              if (voiceRetry) window.clearTimeout(voiceRetry);
+              voiceOutgoingRetryTimersRef.current.delete(event.userId);
               voiceOutgoingRef.current.get(event.userId)?.pc.close();
               voiceOutgoingRef.current.delete(event.userId);
               if (mediaMode === "wtn") {
@@ -1328,6 +1382,9 @@ export function useRoomSession(
             ),
           );
           if (!event.enabled) {
+            const voiceRetry = voiceOutgoingRetryTimersRef.current.get(event.userId);
+            if (voiceRetry) window.clearTimeout(voiceRetry);
+            voiceOutgoingRetryTimersRef.current.delete(event.userId);
             voiceOutgoingRef.current.get(event.userId)?.pc.close();
             voiceOutgoingRef.current.delete(event.userId);
             voiceIncomingRef.current.get(event.userId)?.pc.close();
@@ -1393,10 +1450,13 @@ export function useRoomSession(
             } else if (event.data.type === "answer") {
               const voicePeer = voiceOutgoingRef.current.get(event.from);
               if (voicePeer) {
-                void voicePeer.pc.setRemoteDescription({
-                  type: "answer",
-                  sdp: event.data.sdp,
-                });
+                void voicePeer.pc
+                  .setRemoteDescription({
+                    type: "answer",
+                    sdp: event.data.sdp,
+                  })
+                  .then(() => tuneVoiceSender(voicePeer.pc))
+                  .catch(() => undefined);
               }
             } else {
               if (event.shareOwner === user.id) {
@@ -1901,12 +1961,22 @@ export function useRoomSession(
         await configureVoiceInput(stream, deviceId);
       } catch (error) {
         setNotice(microphoneErrorMessage(error));
+        const currentTrack = micStreamRef.current?.getAudioTracks()[0];
+        if (
+          voiceEnabledRef.current &&
+          (!currentTrack || currentTrack.readyState === "ended")
+        ) {
+          leaveVoiceRef.current();
+        }
       } finally {
         setVoiceSwitching(false);
       }
     },
     [configureVoiceInput, voiceSwitching],
   );
+  recoverMicrophoneRef.current = () => {
+    void switchMicrophone("");
+  };
 
   const setVoiceInputGain = useCallback((value: number) => {
     const next = Math.max(0.2, Math.min(2, value));

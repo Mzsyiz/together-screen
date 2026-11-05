@@ -57,9 +57,9 @@ The project is currently an **MVP / 0.x** application. Desktop Chrome and Edge a
 
 | Tier | Rooms | Allowed transport | Maximum quality | Maximum HD bitrate |
 | --- | --- | --- | --- | --- |
-| Normal | 2-3 participants | Self-hosted P2P/TURN only | 720p | 3 Mbps |
-| Advanced | 4-5 participants | Self-hosted or Volcengine WTN | 2K/1440p | 15 Mbps |
-| Ultimate | 6 participants | Self-hosted or Volcengine WTN | 4K/2160p | 30 Mbps |
+| Normal | 2-6 participants, 5 rooms | Self-hosted P2P/TURN only | 720p | 3 Mbps |
+| Advanced | 2-6 participants, 5 rooms | Self-hosted or Volcengine WTN | 2K/1440p | 15 Mbps |
+| Ultimate | 2-6 participants, 5 rooms | Self-hosted or Volcengine WTN | 4K/2160p | 30 Mbps |
 
 Normal rooms remain self-hosted even if a client modifies requests; WTN and higher quality cannot bypass the server limit. Administrators still choose whether an Advanced or Ultimate room uses WTN while it is empty.
 
@@ -72,6 +72,8 @@ Normal rooms remain self-hosted even if a client modifies requests; WTN and high
 - Input gain, input level, output volume and speaking indicators.
 - Participant connection status and readable permission/device errors.
 - Echo cancellation, noise suppression, automatic gain control, mono capture and a 48 kHz ideal sample rate.
+- Opus preference, an approximately 48 Kbps voice cap and elevated real-time network priority.
+- Automatic fallback to the system default microphone if the active input disconnects.
 
 ### Room chat
 
