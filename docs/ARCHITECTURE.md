@@ -71,7 +71,7 @@ screen HD:      <room>_<user>_screen_hd_<unique>
 voice:          <room>_<user>_voice_<unique>
 ```
 
-The publishing browser creates two WHIP-style `RTCPeerConnection` instances for the screen: a preview stream at roughly 360p / 15 FPS / 300 Kbps and an HD stream using the room's configured resolution, frame rate and bitrate. Preview does not depend on simulcast RIDs, so the WTN application does not need to expose RID switching. Viewers automatically fetch one preview after first entering a share and cache its latest frame, then release the idle subscription. Hover opens a fresh preview and a click replaces it with an independent HD subscription. The cached frame remains visible while a subscription is being established.
+The publishing browser creates two WHIP-style `RTCPeerConnection` instances for the screen: a preview stream at roughly 360p / 15 FPS / 300 Kbps and an HD stream using the room's configured resolution, frame rate and bitrate. Preview does not depend on simulcast RIDs, so the WTN application does not need to expose RID switching. Viewers automatically subscribe to and continuously play a preview for every visible share. A click replaces preview with an independent HD subscription. Moving focus or leaving HD re-subscribes preview; the cached latest frame is only a negotiation-time fallback.
 
 The second stream adds roughly 300 Kbps to the sharer's upload, but makes preview and HD deterministic by using separate StreamIDs instead of a per-stream layer selector. Screen system audio is published with the HD stream only; microphone voice remains a separate voice stream.
 
@@ -97,7 +97,7 @@ The Fastify server:
 5. The sharer creates one outgoing `RTCPeerConnection` per room member.
 6. Offer, answer and ICE candidates are relayed by the server.
 
-### Latest frame, preview and HD
+### Automatic preview, HD and latest-frame fallback
 
 Each outgoing video sender starts in preview mode:
 
@@ -106,7 +106,7 @@ Each outgoing video sender starts in preview mode:
 - resolution scaled to approximately 360p;
 - low network priority.
 
-Each viewer keeps a local latest-frame cache per sharer. When no cache exists, the client opens one low-bitrate preview, captures a real decoded frame, and releases the idle subscription. The cached frame is shown while idle instead of the stale JPEG poster captured at share start. Hovering reveals the live preview. Clicking requests HD:
+After entering a room, the viewer immediately requests a low-bitrate preview for every sharer and plays it continuously without hover or click. Each viewer also keeps a local latest-frame cache. The cached image covers subscription setup, preview/HD transitions and reconnects, then disappears as soon as a new video frame is available. Clicking requests HD:
 
 1. Viewer sends `quality.request`.
 2. Server validates room membership and that the target is sharing.
@@ -121,7 +121,8 @@ If parameter application fails, the viewer remains in preview mode and receives 
 - WebSocket disconnect: reconnect with a short backoff.
 - Screen share stop: keep the last frame for a short grace period to avoid UI flashing.
 - Participant disconnect: delay removal briefly to absorb transient network changes.
-- Active video updates the local latest-frame cache about once per second; losing focus, switching tiles or leaving hover captures the current frame immediately.
+- Automatically playing video updates the local latest-frame cache about once per second; switching tiles or leaving HD captures the current frame immediately.
+- A healthy preview stays live; the latest frame never freezes normal low-bitrate playback.
 - Clicking a frozen idle tile always re-requests preview or HD even though it currently has no `MediaStream`.
 - A new share uses a new `startedAt` cache key, preventing stale frames from leaking across share sessions.
 

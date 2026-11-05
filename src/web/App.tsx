@@ -424,7 +424,7 @@ function Lobby({
           <div>
             <b>共享很轻，加入很快</b>
             <p>
-              未聚焦的画面保留最近一帧；悬浮用低码率预览，点击后才切换到高清流。
+              进入房间后自动播放轻量预览；最近一帧用于切换画面时防止黑屏，点击预览即可切换高清。
             </p>
           </div>
         </div>
@@ -826,7 +826,6 @@ function VideoTile({
   variant = "grid",
   onFocus,
   requestQuality,
-  releaseQuality,
 }: {
   participant: Participant;
   share: ActiveShare | null;
@@ -838,23 +837,21 @@ function VideoTile({
   variant?: "grid" | "spotlight" | "strip";
   onFocus: () => void;
   requestQuality: (ownerId: string, quality: QualityLevel) => void;
-  releaseQuality: (ownerId: string) => void;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const tileRef = useRef<HTMLDivElement>(null);
   const frameCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const frameKey = shareFrameKey(participant.id, share);
   const cachedFrame = lastFrameCache.get(participant.id);
-  const [hovered, setHovered] = useState(false);
   const [hasVideoFrame, setHasVideoFrame] = useState(false);
   const [lastFrame, setLastFrame] = useState<CachedVideoFrame | null>(
     cachedFrame?.shareKey === frameKey ? cachedFrame : null,
   );
-  const active = Boolean(stream) && (isSelf || focused || hovered);
+  const active = Boolean(stream);
   const activeLastFrame =
     lastFrame?.shareKey === frameKey ? lastFrame.dataUrl : null;
-  const showLastFrame = Boolean(activeLastFrame) && (!active || !hasVideoFrame);
-  const showFramePlaceholder = !activeLastFrame && !active;
+  const showLastFrame = Boolean(activeLastFrame) && !hasVideoFrame;
+  const showFramePlaceholder = !activeLastFrame && !stream;
   const hdConfirmed = confirmedQuality === "hd";
   const resolutionLabel =
     share?.settings.resolution === "1080p" ? "1920×1080" : "1280×720";
@@ -864,13 +861,9 @@ function VideoTile({
       ? hdConfirmed
         ? `高清 · ${(share?.settings.bitrateKbps ?? 3000) / 1000} Mbps 上限 · ${resolutionLabel}`
         : "正在切换高清"
-      : hovered
-        ? confirmedQuality === "low"
-          ? "轻量预览 · 300 Kbps 上限"
-          : "正在建立轻量预览"
-        : activeLastFrame
-          ? "最近画面 · 静止"
-          : "正在获取最近画面";
+      : confirmedQuality === "low"
+        ? "轻量预览 · 自动播放"
+        : "正在连接轻量预览";
 
   const captureFrame = () => {
     const video = videoRef.current;
@@ -935,45 +928,26 @@ function VideoTile({
 
   useEffect(() => {
     if (isSelf) return;
-    if (focused) requestQuality(participant.id, "hd");
-    else if (hovered) requestQuality(participant.id, "low");
-  }, [focused, hovered, isSelf, participant.id, requestQuality]);
-
-  useEffect(() => {
-    if (
-      isSelf ||
-      focused ||
-      hovered ||
-      stream ||
-      activeLastFrame ||
-      !share
-    ) {
-      return;
-    }
-    requestQuality(participant.id, "low");
+    requestQuality(participant.id, focused ? "hd" : "low");
   }, [
-    activeLastFrame,
     focused,
-    hovered,
+    frameKey,
     isSelf,
     participant.id,
     requestQuality,
-    share,
-    stream,
   ]);
 
   useEffect(() => {
-    if (isSelf || !stream || !active) return;
+    if (isSelf || !stream) return;
     const timer = window.setInterval(() => {
-      const frame = captureFrame();
-      if (frame && !hovered && !focused) setLastFrame(frame);
+      captureFrame();
     }, 1000);
     return () => {
       window.clearInterval(timer);
       const frame = captureFrame();
       if (frame) setLastFrame(frame);
     };
-  }, [active, focused, frameKey, hovered, isSelf, stream]);
+  }, [frameKey, isSelf, stream]);
 
   useEffect(() => {
     if (isSelf) return;
@@ -989,47 +963,12 @@ function VideoTile({
     };
   }, [frameKey, isSelf, participant.id, stream]);
 
-  useEffect(() => {
-    if (
-      isSelf ||
-      focused ||
-      hovered ||
-      activeLastFrame ||
-      !stream ||
-      !hasVideoFrame
-    ) {
-      return;
-    }
-    const frozen = captureFrame();
-    if (!frozen) return;
-    setLastFrame(frozen);
-    releaseQuality(participant.id);
-  }, [
-    activeLastFrame,
-    focused,
-    hasVideoFrame,
-    hovered,
-    isSelf,
-    participant.id,
-    releaseQuality,
-    stream,
-  ]);
-
   const fullscreen = async () => {
     try {
       await tileRef.current?.requestFullscreen();
     } catch {
       // Fullscreen can be denied by an embedding browser.
     }
-  };
-
-  const leavePreview = () => {
-    if (!isSelf && !focused) {
-      const frame = captureFrame();
-      if (frame) setLastFrame(frame);
-    }
-    setHovered(false);
-    if (!focused) releaseQuality(participant.id);
   };
 
   if (!share) {
@@ -1047,20 +986,6 @@ function VideoTile({
     <div
       ref={tileRef}
       className={`video-tile has-video ${variant} ${focused ? "focused" : ""} ${active ? "previewing" : ""} ${hasVideoFrame ? "has-frame" : ""} ${activeLastFrame ? "has-last-frame" : ""}`}
-      onPointerEnter={() => {
-        setHovered(true);
-        if (!focused) requestQuality(participant.id, "low");
-      }}
-      onMouseEnter={() => {
-        setHovered(true);
-        if (!focused) requestQuality(participant.id, "low");
-      }}
-      onPointerLeave={() => {
-        leavePreview();
-      }}
-      onMouseLeave={() => {
-        leavePreview();
-      }}
       onClick={() => share && onFocus()}
       onDoubleClick={() => {
         if (variant === "spotlight") void fullscreen();
@@ -1103,7 +1028,7 @@ function VideoTile({
           <span>正在获取最近画面</span>
         </div>
       )}
-      {stream && active && !hasVideoFrame && (
+      {stream && !hasVideoFrame && (
         <div className="frame-buffering">
           <span className="spinner" />
           正在接收画面
@@ -1702,7 +1627,6 @@ function RoomView({
                   confirmedQuality={session.confirmedQuality[participant.id]}
                   onFocus={() => selectShare(participant)}
                   requestQuality={session.requestQuality}
-                  releaseQuality={session.releaseQualityPreview}
                 />
               ))}
             </div>
@@ -1726,7 +1650,6 @@ function RoomView({
                   }
                 }}
                 requestQuality={session.requestQuality}
-                releaseQuality={session.releaseQualityPreview}
               />
               {secondaryParticipants.length > 0 && (
                 <aside className="share-strip" aria-label="其他共享画面">
@@ -1747,7 +1670,6 @@ function RoomView({
                       variant="strip"
                       onFocus={() => selectShare(participant)}
                       requestQuality={session.requestQuality}
-                      releaseQuality={session.releaseQualityPreview}
                     />
                   ))}
                 </aside>

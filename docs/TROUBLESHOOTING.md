@@ -36,7 +36,7 @@ Recommend desktop Chrome or Edge.
 
 The current client caches the latest real decoded frame and uses it while a tile is idle. If video still turns black:
 
-1. Hover the tile to reveal the live preview.
+1. Confirm the tile shows “Preview · Autoplay” or “Connecting lightweight preview”.
 2. Check whether the sender still shows “Stopping share” incorrectly.
 3. Check browser console and `chrome://webrtc-internals`.
 4. Verify that the shared window still exists and is not protected content.
@@ -48,7 +48,7 @@ Do not upload a raw WebRTC dump publicly; it may contain IP addresses and networ
 
 Check the quality state:
 
-- “Latest frame · Frozen” means the last real decoded frame is visible.
+- A “Latest frame” overlay should appear only briefly during connect, switch or reconnect.
 - “Preview” is intentionally low bitrate and about 360p.
 - “HD” appears only after the sharer confirms sender parameters.
 
@@ -125,7 +125,7 @@ Check:
 
 The browser must never receive `WTN_APP_KEY`. If a WTN request fails, use the response status and the browser Network panel; do not paste the full JWTs into public Issues.
 
-WTN screen quality no longer depends on `RID`. Every share creates two independent StreamIDs; their request paths contain `_screen_preview` and `_screen_hd`. Hovering should show “lightweight preview”, a click should show “switching to HD”, and the HD badge should appear only after the independent HD subscription succeeds. If the HD subscription fails, the viewer remains on preview and receives the error. Server logs or the Network panel should show the HD publish and subscribe requests.
+WTN screen quality no longer depends on `RID`. Every share creates two independent StreamIDs; their request paths contain `_screen_preview` and `_screen_hd`. Entering the room should automatically show “Preview · Autoplay”; a click should show “Switching to HD”, and the HD badge should appear only after the independent HD subscription succeeds. If the HD subscription fails, the viewer remains on preview and receives the error. Server logs or the Network panel should show the HD publish and subscribe requests.
 
 If preview works but HD never appears, check that the second screen publish request succeeded, that the WTN application permits two streams from the same user, and that the room has not reached a WTN concurrency limit. Do not paste full JWTs into public Issues.
 

@@ -19,7 +19,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 ### Changed
 
 - Idle tiles now show the latest real decoded frame instead of the stale share-start poster.
-- First entry automatically captures one lightweight frame; live preview starts on hover and HD remains click-driven.
+- Remote shares now autoplay their lightweight preview on entry; the latest-frame cache is only a connection and switch fallback.
 - Settings popovers now escape the bottom control bar clipping context.
 - Docker configuration now forwards TURN shared-secret and proxy/session settings.
 

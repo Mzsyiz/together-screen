@@ -753,18 +753,6 @@ export function useRoomSession(
     [mediaMode, requestWtnScreenQuality, send, user.id],
   );
 
-  const releaseQualityPreview = useCallback(
-    (ownerId: string) => {
-      if (
-        mediaMode === "wtn" &&
-        focusedRef.current !== ownerId
-      ) {
-        closeWtnScreenSubscription(ownerId);
-      }
-    },
-    [closeWtnScreenSubscription, mediaMode],
-  );
-
   const closeVoicePeers = useCallback(() => {
     for (const timer of voiceOutgoingRetryTimersRef.current.values()) {
       window.clearTimeout(timer);
@@ -1941,17 +1929,13 @@ export function useRoomSession(
     (ownerId: string | null) => {
       const previous = focusedRef.current;
       if (previous && previous !== ownerId) {
-        if (mediaMode === "wtn") {
-          closeWtnScreenSubscription(previous);
-        } else {
-          requestQuality(previous, "low");
-        }
+        requestQuality(previous, "low");
       }
       setFocusedUserId(ownerId);
       focusedRef.current = ownerId;
       if (ownerId) requestQuality(ownerId, "hd");
     },
-    [closeWtnScreenSubscription, mediaMode, requestQuality],
+    [requestQuality],
   );
 
   const sendText = useCallback(
@@ -2000,7 +1984,6 @@ export function useRoomSession(
     refreshVoiceInputDevices,
     focusShare,
     requestQuality,
-    releaseQualityPreview,
     sendText,
   };
 }

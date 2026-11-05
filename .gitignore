@@ -55,4 +55,5 @@ Thumbs.db
 
 # Generated release artifacts
 /together-screen-server.tar.gz
+/release/
 *.tgz
