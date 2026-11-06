@@ -1,22 +1,16 @@
 export const ROOM_DEFINITIONS = [
-  { id: "room-2", name: "普通双人房", capacity: 2, tier: "normal" },
-  { id: "room-3", name: "普通三人房", capacity: 3, tier: "normal" },
-  { id: "room-4", name: "普通四人房", capacity: 4, tier: "normal" },
-  { id: "room-5", name: "普通五人房", capacity: 5, tier: "normal" },
-  { id: "room-6", name: "普通六人房", capacity: 6, tier: "normal" },
-  { id: "advanced-2", name: "高级双人房", capacity: 2, tier: "advanced" },
-  { id: "advanced-3", name: "高级三人房", capacity: 3, tier: "advanced" },
-  { id: "advanced-4", name: "高级四人房", capacity: 4, tier: "advanced" },
-  { id: "advanced-5", name: "高级五人房", capacity: 5, tier: "advanced" },
-  { id: "advanced-6", name: "高级六人房", capacity: 6, tier: "advanced" },
-  { id: "ultimate-2", name: "极致双人房", capacity: 2, tier: "ultimate" },
-  { id: "ultimate-3", name: "极致三人房", capacity: 3, tier: "ultimate" },
-  { id: "ultimate-4", name: "极致四人房", capacity: 4, tier: "ultimate" },
-  { id: "ultimate-5", name: "极致五人房", capacity: 5, tier: "ultimate" },
-  { id: "ultimate-6", name: "极致六人房", capacity: 6, tier: "ultimate" },
+  { id: "room-1", name: "房间1", capacity: 10 },
+  { id: "room-2", name: "房间2", capacity: 10 },
+  { id: "room-3", name: "房间3", capacity: 10 },
+  { id: "room-4", name: "房间4", capacity: 10 },
+  { id: "room-5", name: "房间5", capacity: 10 },
+  { id: "room-6", name: "房间6", capacity: 10 },
+  { id: "room-7", name: "房间7", capacity: 10 },
+  { id: "room-8", name: "房间8", capacity: 10 },
+  { id: "room-9", name: "房间9", capacity: 10 },
+  { id: "room-10", name: "房间10", capacity: 10 },
 ] as const;
 
-export type RoomTier = (typeof ROOM_DEFINITIONS)[number]["tier"];
 export type RoomId = (typeof ROOM_DEFINITIONS)[number]["id"];
 export type MediaMode = "p2p" | "wtn";
 export type WtnMediaKind = "screen" | "voice";
@@ -65,7 +59,6 @@ export const SHARE_QUALITY_MODES = {
     frameRate: 10,
     bitrateKbps: 1_500,
     degradationPreference: "balanced",
-    tiers: ["normal", "advanced", "ultimate"],
   },
   standard: {
     name: "标准",
@@ -74,7 +67,6 @@ export const SHARE_QUALITY_MODES = {
     frameRate: 15,
     bitrateKbps: 2_500,
     degradationPreference: "maintain-resolution",
-    tiers: ["normal", "advanced", "ultimate"],
   },
   hd: {
     name: "高清",
@@ -83,7 +75,6 @@ export const SHARE_QUALITY_MODES = {
     frameRate: 30,
     bitrateKbps: 4_000,
     degradationPreference: "balanced",
-    tiers: ["normal", "advanced", "ultimate"],
   },
   ultra: {
     name: "超清",
@@ -92,7 +83,6 @@ export const SHARE_QUALITY_MODES = {
     frameRate: 30,
     bitrateKbps: 8_000,
     degradationPreference: "maintain-resolution",
-    tiers: ["advanced", "ultimate"],
   },
   gaming: {
     name: "游戏",
@@ -101,7 +91,6 @@ export const SHARE_QUALITY_MODES = {
     frameRate: 60,
     bitrateKbps: 8_000,
     degradationPreference: "maintain-framerate",
-    tiers: ["advanced", "ultimate"],
   },
   fourK: {
     name: "4K",
@@ -110,113 +99,33 @@ export const SHARE_QUALITY_MODES = {
     frameRate: 30,
     bitrateKbps: 20_000,
     degradationPreference: "maintain-resolution",
-    tiers: ["ultimate"],
   },
 } as const;
 
 export type ShareQualityMode = keyof typeof SHARE_QUALITY_MODES;
 
-export const ROOM_TIER_DETAILS = {
-  normal: {
-    name: "普通",
-    description: "自建线路 · 最高 720p · 3 Mbps",
-    mediaModes: ["p2p"] as const,
-    maxWidth: 1280,
-    maxHeight: 720,
-    maxBitrateKbps: 3_000,
-    allowNativeSource: false,
-  },
-  advanced: {
-    name: "高级",
-    description: "自建或 WTN · 最高 2K · 15 Mbps",
-    mediaModes: ["p2p", "wtn"] as const,
-    maxWidth: 2560,
-    maxHeight: 1440,
-    maxBitrateKbps: 15_000,
-    allowNativeSource: false,
-  },
-  ultimate: {
-    name: "极致",
-    description: "自建或 WTN · 最高 4K · 30 Mbps",
-    mediaModes: ["p2p", "wtn"] as const,
-    maxWidth: 3840,
-    maxHeight: 2160,
-    maxBitrateKbps: 30_000,
-    allowNativeSource: true,
-  },
-} as const;
-
-export function mediaModeAllowedForTier(
-  tier: RoomTier,
-  mode: MediaMode,
-): boolean {
-  return (ROOM_TIER_DETAILS[tier].mediaModes as readonly MediaMode[]).includes(
-    mode,
-  );
-}
-
-export function qualityModeAllowedForTier(
-  tier: RoomTier,
-  mode: ShareQualityMode,
-): boolean {
-  return (SHARE_QUALITY_MODES[mode].tiers as readonly RoomTier[]).includes(tier);
-}
-
 export function shareSettingsForMode(
-  tier: RoomTier,
   mode: ShareQualityMode,
 ): ShareSettings {
   const profile = SHARE_QUALITY_MODES[mode];
-  const target = SHARE_RESOLUTION_DETAILS[profile.resolution];
-  const tierDetails = ROOM_TIER_DETAILS[tier];
-  const resolution: ShareResolution =
-    target.width === null ||
-    target.height === null ||
-    target.width <= tierDetails.maxWidth &&
-      target.height <= tierDetails.maxHeight
-      ? profile.resolution
-      : "720p";
   return {
     qualityMode: mode,
-    resolution,
+    resolution: profile.resolution,
     frameRate: profile.frameRate,
-    bitrateKbps: Math.min(
-      profile.bitrateKbps,
-      tierDetails.maxBitrateKbps,
-    ),
+    bitrateKbps: profile.bitrateKbps,
     degradationPreference: profile.degradationPreference,
   };
 }
 
-export function shareSettingsAllowedForTier(
-  tier: RoomTier,
-  settings: ShareSettings,
-): boolean {
-  const tierDetails = ROOM_TIER_DETAILS[tier];
+export function isValidShareSettings(settings: ShareSettings): boolean {
   const mode = SHARE_QUALITY_MODES[settings.qualityMode];
-  if (!mode || !qualityModeAllowedForTier(tier, settings.qualityMode)) {
-    return false;
-  }
-  const resolution = SHARE_RESOLUTION_DETAILS[settings.resolution];
-  const modeResolution = SHARE_RESOLUTION_DETAILS[mode.resolution];
-  if (!resolution) return false;
-  if (settings.resolution === "source" && !tierDetails.allowNativeSource) {
-    return false;
-  }
-  const height = resolution.height ?? tierDetails.maxHeight;
-  const width = resolution.width ?? tierDetails.maxWidth;
+  if (!mode) return false;
+  const expected = shareSettingsForMode(settings.qualityMode);
   return (
-    [5, 10, 15, 30, 60].includes(settings.frameRate) &&
-    Number.isFinite(settings.bitrateKbps) &&
-    settings.bitrateKbps >= 300 &&
-    settings.bitrateKbps <= tierDetails.maxBitrateKbps &&
-    settings.bitrateKbps <= mode.bitrateKbps &&
-    settings.frameRate <= mode.frameRate &&
-    settings.degradationPreference === mode.degradationPreference &&
-    height <= (modeResolution.height ?? tierDetails.maxHeight) &&
-    width <= (modeResolution.width ?? tierDetails.maxWidth) &&
-    height <= tierDetails.maxHeight &&
-    width <= tierDetails.maxWidth
+    settings.resolution === expected.resolution &&
+    settings.frameRate === expected.frameRate &&
+    settings.bitrateKbps === expected.bitrateKbps &&
+    settings.degradationPreference === expected.degradationPreference
   );
 }
 
@@ -231,7 +140,6 @@ export interface RoomSummary {
   id: RoomId;
   name: string;
   capacity: number;
-  tier: RoomTier;
   occupants: number;
   available: boolean;
   mediaMode: MediaMode;

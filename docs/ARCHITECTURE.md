@@ -50,7 +50,7 @@ C sends screen and voice to A and B
 
 For `N` participants, there can be up to `N × (N - 1)` directional media links. The browser performs encoding and decoding locally, so the application server only carries signaling and chat traffic.
 
-This is a cost-effective choice for small rooms. It becomes inefficient when the room grows: sender upload, browser encoding load and TURN egress all increase rapidly.
+This is a cost-effective choice for small rooms. A ten-person room can reach 90 directional links; sender upload, browser encoding load and TURN egress then increase rapidly. WTN is preferable when several people share at once.
 
 ## Per-room media modes
 
@@ -61,15 +61,7 @@ Each fixed room stores a persistent `mediaMode`:
 
 Only an administrator can change the mode, and only while the room is empty. This avoids tearing down active media unexpectedly.
 
-Every room also has a fixed cost tier:
-
-| Tier | Capacity | Allowed transport | Maximum quality and bitrate |
-| --- | --- | --- | --- |
-| Normal | 2-6 participants, one room each | P2P/TURN only | 720p / 3 Mbps |
-| Advanced | 2-6 participants, one room each | P2P/TURN or WTN | 1440p / 15 Mbps |
-| Ultimate | 2-6 participants, one room each | P2P/TURN or WTN | 2160p / 30 Mbps |
-
-Tier limits are enforced by the server. A Normal room rejects manually crafted WTN or high-quality requests.
+The application provides ten identical rooms with a capacity of 10 participants each. There are no room tiers. An administrator can independently choose P2P/TURN or WTN for every empty room.
 
 The client exposes standardized usage profiles instead of arbitrary resolution, frame-rate and bitrate combinations:
 
@@ -80,9 +72,9 @@ The client exposes standardized usage profiles instead of arbitrary resolution, 
 | HD | 1080p / 30 FPS / 4 Mbps | Balanced | Software demos, animation and video |
 | Ultra | 1440p / 30 FPS / 8 Mbps | Resolution first | High-resolution desktops and detail |
 | Gaming | 1080p / 60 FPS / 8 Mbps | Frame rate first | Games and fast movement |
-| 4K | 2160p / 30 FPS / 20 Mbps | Resolution first | Ultimate rooms only |
+| 4K | 2160p / 30 FPS / 20 Mbps | Resolution first | 4K source and sufficient upload |
 
-Normal rooms clamp higher modes to the 720p / 3 Mbps ceiling. Advanced rooms expose up to Ultra and Gaming, while 4K is available only in Ultimate rooms. WebRTC congestion control continues to adapt actual send bitrate.
+Every room exposes the same six profiles. WebRTC congestion control continues to adapt actual send bitrate.
 
 ### Volcengine WTN path
 

@@ -12,7 +12,6 @@ import type {
   PublicUser,
   QualityLevel,
   RtcIceServer,
-  RoomTier,
   ServerEvent,
   ShareSettings,
   WtnStreamQuality,
@@ -230,7 +229,6 @@ export function useRoomSession(
   user: PublicUser,
   roomId: Parameters<typeof api.messages>[0],
   mediaMode: MediaMode,
-  roomTier: RoomTier,
   onSessionReplaced?: () => void,
 ) {
   const [connectionState, setConnectionState] = useState<
@@ -261,7 +259,7 @@ export function useRoomSession(
     Record<string, QualityLevel>
   >({});
   const [settings, setSettings] = useState<ShareSettings>(() =>
-    shareSettingsForMode(roomTier, "standard"),
+    shareSettingsForMode("standard"),
   );
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [focusedUserId, setFocusedUserId] = useState<string | null>(null);

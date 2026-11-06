@@ -1,8 +1,7 @@
 import type { RawData, WebSocket } from "ws";
 import {
   ROOM_DEFINITIONS,
-  mediaModeAllowedForTier,
-  shareSettingsAllowedForTier,
+  isValidShareSettings,
   type ActiveShare,
   type ChatMessage,
   type ClientEvent,
@@ -61,13 +60,7 @@ export class RoomHub {
     for (const room of ROOM_DEFINITIONS) {
       this.members.set(room.id, new Map());
       this.shares.set(room.id, new Map());
-      const requestedMode = initialModes[room.id] ?? "p2p";
-      this.mediaModes.set(
-        room.id,
-        mediaModeAllowedForTier(room.tier, requestedMode)
-          ? requestedMode
-          : "p2p",
-      );
+      this.mediaModes.set(room.id, initialModes[room.id] ?? "p2p");
     }
   }
 
@@ -78,7 +71,6 @@ export class RoomHub {
         id: room.id,
         name: room.name,
         capacity: room.capacity,
-        tier: room.tier,
         occupants,
         available: occupants < room.capacity,
         mediaMode: this.mediaModes.get(room.id) ?? "p2p",
@@ -87,8 +79,7 @@ export class RoomHub {
   }
 
   setRoomMediaMode(roomId: RoomId, mode: MediaMode): boolean {
-    const room = roomDefinition(roomId);
-    if (!room || !mediaModeAllowedForTier(room.tier, mode)) return false;
+    if (!roomDefinition(roomId)) return false;
     this.mediaModes.set(roomId, mode);
     return true;
   }
@@ -305,8 +296,7 @@ export class RoomHub {
     poster: string,
     settings: ShareSettings,
   ) {
-    const room = roomDefinition(roomId);
-    if (!room || !shareSettingsAllowedForTier(room.tier, settings)) {
+    if (!isValidShareSettings(settings)) {
       send(connection.socket, { type: "room.error", message: "投屏参数不合法" });
       return;
     }
@@ -338,8 +328,7 @@ export class RoomHub {
   }
 
   private updateShare(connection: Connection, roomId: RoomId, settings: ShareSettings) {
-    const room = roomDefinition(roomId);
-    if (!room || !shareSettingsAllowedForTier(room.tier, settings)) {
+    if (!isValidShareSettings(settings)) {
       send(connection.socket, { type: "room.error", message: "投屏参数不合法" });
       return;
     }
@@ -455,7 +444,6 @@ export class RoomHub {
       id: roomId,
       name: "",
       capacity: 0,
-      tier: roomDefinition(roomId)?.tier ?? "normal",
       occupants: 0,
       available: false,
       mediaMode: this.mediaModes.get(roomId) ?? "p2p",

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { WebSocket } from "ws";
+import { shareSettingsForMode } from "../shared/types.js";
 import type { PublicUser, ServerEvent } from "../shared/types.js";
 import { RoomHub } from "./room-hub.js";
 
@@ -31,28 +32,23 @@ function user(id: string): PublicUser {
 }
 
 describe("room hub", () => {
-  it("creates all tier and capacity combinations", () => {
+  it("creates ten rooms with ten seats each", () => {
     const hub = new RoomHub();
-    expect(hub.roomSummaries().map((room) => room.capacity)).toEqual([
-      2, 3, 4, 5, 6,
-      2, 3, 4, 5, 6,
-      2, 3, 4, 5, 6,
-    ]);
+    expect(hub.roomSummaries().map((room) => room.capacity)).toEqual(
+      Array(10).fill(10),
+    );
     expect(hub.roomSummaries().every((room) => room.mediaMode === "p2p")).toBe(
       true,
     );
   });
 
   it("stores an independent media mode for each room", () => {
-    const hub = new RoomHub({ "room-2": "wtn", "advanced-2": "wtn" });
+    const hub = new RoomHub({ "room-2": "wtn" });
     expect(hub.roomSummaries()[0].mediaMode).toBe("p2p");
-    expect(hub.roomSummaries()[5].mediaMode).toBe("wtn");
-    expect(hub.roomSummaries()[6].mediaMode).toBe("p2p");
+    expect(hub.roomSummaries()[1].mediaMode).toBe("wtn");
 
-    expect(hub.setRoomMediaMode("room-2", "wtn")).toBe(false);
-    expect(hub.setRoomMediaMode("advanced-3", "wtn")).toBe(true);
-    expect(hub.roomSummaries()[0].mediaMode).toBe("p2p");
-    expect(hub.roomSummaries()[6].mediaMode).toBe("wtn");
+    expect(hub.setRoomMediaMode("room-1", "wtn")).toBe(true);
+    expect(hub.roomSummaries()[0].mediaMode).toBe("wtn");
   });
 
   it("allows only one screen share per user and relays starts to others", () => {
@@ -70,13 +66,7 @@ describe("room hub", () => {
     const event = {
       type: "share.started",
       poster: "data:image/jpeg;base64,AAAA",
-      settings: {
-        qualityMode: "hd",
-        frameRate: 30,
-        bitrateKbps: 3000,
-        resolution: "720p",
-        degradationPreference: "balanced",
-      },
+      settings: shareSettingsForMode("hd"),
     };
     firstSocket.emit("message", JSON.stringify(event));
     firstSocket.emit("message", JSON.stringify(event));
@@ -93,11 +83,11 @@ describe("room hub", () => {
     hub.attach(user("bob"), observer as unknown as WebSocket);
     socket.emit(
       "message",
-      JSON.stringify({ type: "room.join", roomId: "ultimate-6" }),
+      JSON.stringify({ type: "room.join", roomId: "room-10" }),
     );
     observer.emit(
       "message",
-      JSON.stringify({ type: "room.join", roomId: "ultimate-6" }),
+      JSON.stringify({ type: "room.join", roomId: "room-10" }),
     );
     socket.sent.length = 0;
     observer.sent.length = 0;
@@ -107,13 +97,7 @@ describe("room hub", () => {
       JSON.stringify({
         type: "share.started",
         poster: "data:image/jpeg;base64,AAAA",
-        settings: {
-          qualityMode: "fourK",
-          frameRate: 30,
-          bitrateKbps: 20_000,
-          resolution: "2160p",
-          degradationPreference: "maintain-resolution",
-        },
+        settings: shareSettingsForMode("fourK"),
       }),
     );
     expect(
@@ -127,11 +111,8 @@ describe("room hub", () => {
         type: "share.started",
         poster: "data:image/jpeg;base64,AAAA",
         settings: {
-          qualityMode: "fourK",
-          frameRate: 30,
+          ...shareSettingsForMode("fourK"),
           bitrateKbps: 20_500,
-          resolution: "2160p",
-          degradationPreference: "maintain-resolution",
         },
       }),
     );
@@ -143,8 +124,8 @@ describe("room hub", () => {
 
   it("rejects an extra participant when a capacity room is full", () => {
     const hub = new RoomHub();
-    const sockets = Array.from({ length: 3 }, () => new FakeSocket());
-    for (let index = 0; index < 3; index += 1) {
+    const sockets = Array.from({ length: 11 }, () => new FakeSocket());
+    for (let index = 0; index < 11; index += 1) {
       hub.attach(user(`user-${index}`), sockets[index] as unknown as WebSocket);
       sockets[index].emit(
         "message",
@@ -152,8 +133,8 @@ describe("room hub", () => {
       );
     }
 
-    expect(hub.roomSummaries()[0].occupants).toBe(2);
-    expect(sockets[2].sent.at(-1)?.type).toBe("room.error");
+    expect(hub.roomSummaries()[1].occupants).toBe(10);
+    expect(sockets[10].sent.at(-1)?.type).toBe("room.error");
   });
 
   it("broadcasts voice state and disconnects replaced sessions", () => {
@@ -180,7 +161,7 @@ describe("room hub", () => {
     hub.disconnectUser("alice");
     expect(firstSocket.sent.some((message) => message.type === "session.replaced")).toBe(true);
     expect(firstSocket.readyState).toBe(3);
-    expect(hub.roomSummaries()[1].occupants).toBe(1);
+    expect(hub.roomSummaries()[2].occupants).toBe(1);
   });
 
   it("relays quality changes only after the sharer acknowledges the result", () => {
@@ -202,13 +183,7 @@ describe("room hub", () => {
       JSON.stringify({
         type: "share.started",
         poster: "data:image/jpeg;base64,AAAA",
-        settings: {
-          qualityMode: "hd",
-          frameRate: 30,
-          bitrateKbps: 3000,
-          resolution: "720p",
-          degradationPreference: "balanced",
-        },
+        settings: shareSettingsForMode("hd"),
       }),
     );
     sharerSocket.sent.length = 0;

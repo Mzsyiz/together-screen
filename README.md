@@ -33,7 +33,7 @@ The project is currently an **MVP / 0.x** application. Desktop Chrome and Edge a
 
 - One room each for 2, 3, 4, 5 and 6 participants.
 - Administrators can select P2P/TURN or Volcengine WTN independently for each room.
-- Rooms are grouped into Normal, Advanced and Ultimate cost tiers, with server-enforced transport and quality ceilings.
+- Ten identical rooms are available, each with a capacity of 10 participants and no tier restrictions.
 - An account can be active in only one room at a time.
 - Each user can share one screen at a time.
 - Multiple users can share screens simultaneously.
@@ -42,26 +42,20 @@ The project is currently an **MVP / 0.x** application. Desktop Chrome and Edge a
 
 - WebRTC peer-to-peer screen sharing; media does not pass through the application server by default.
 - Managed Volcengine WTN publishing and subscriptions when enabled for the room.
-- Default Standard: `1080p / 15 FPS / 2.5 Mbps`; Normal rooms automatically clamp it to `720p / 15 FPS / 2.5 Mbps`.
+- Default Standard: `1080p / 15 FPS / 2.5 Mbps`.
 - Users select a use case instead of arbitrarily combining resolution and frame rate.
 - Every remote share starts its lightweight live preview automatically after entry, without hover or click.
 - The latest decoded frame is a transition fallback only and never freezes a healthy preview.
 - P2P confirms sender encoding changes; WTN subscribes to an independently published HD stream.
-- Standard profiles cover 720p, 1080p, 2K/1440p and 4K/2160p, with availability determined by room tier.
+- Every room can select 720p, 1080p, 2K/1440p and 4K/2160p standard profiles.
 - WTN republishes the selected standard profile while WebRTC congestion control adapts actual send bitrate.
 - Grid, spotlight, secondary-share strip and fullscreen layouts.
 - Switching tiles or returning from HD keeps the latest frame visible during negotiation, then resumes the lightweight live preview.
 - Screen audio is supported when the operating system and browser expose it.
 
-### Room cost tiers
+### Rooms
 
-| Tier | Rooms | Allowed transport | Maximum quality | Maximum HD bitrate |
-| --- | --- | --- | --- | --- |
-| Normal | 2-6 participants, 5 rooms | Self-hosted P2P/TURN only | 720p | 3 Mbps |
-| Advanced | 2-6 participants, 5 rooms | Self-hosted or Volcengine WTN | 2K/1440p | 15 Mbps |
-| Ultimate | 2-6 participants, 5 rooms | Self-hosted or Volcengine WTN | 4K/2160p | 30 Mbps |
-
-Normal rooms remain self-hosted even if a client modifies requests; WTN and higher quality cannot bypass the server limit. Administrators still choose whether an Advanced or Ultimate room uses WTN while it is empty.
+The lobby provides “Room 1” through “Room 10”, each with a fixed capacity of 10 participants. All rooms share the same quality profiles. An administrator may independently choose self-hosted P2P/TURN or Volcengine WTN for each empty room.
 
 ### Voice chat
 
@@ -115,9 +109,11 @@ The application server handles accounts, sessions, room state, signaling and cha
 
 In a WTN room, each participant publishes separate screen-preview, screen-HD and voice streams to Volcengine, and viewers create subscriptions on demand. The dual-stream design does not depend on WTN simulcast RIDs and adds roughly 300 Kbps to a screen sharer's upload. The application server remains the control plane and issues short-lived WTN JWTs without exposing `WTN_APP_KEY` to the browser.
 
-A mesh room can have up to `N × (N - 1)` directional media links. In a six-person room where everyone shares HD video, each sender may need to encode five outgoing streams. This design targets small rooms, not large conferences.
+A mesh room can have up to `N × (N - 1)` directional media links. A ten-person room can therefore reach 90 directional links, and each sharer may need to encode several outgoing streams. WTN is recommended when many participants share simultaneously; P2P/TURN is better for a smaller number of active sharers.
 
 See [Architecture](docs/ARCHITECTURE.md) for signaling, quality negotiation, voice lifecycle and scalability details.
+
+See [Screen-sharing parameter reference](docs/SCREEN_SHARING_BENCHMARK.md) for publicly documented parameters from mainstream collaboration products.
 
 ## Requirements
 
@@ -313,7 +309,7 @@ docs/             Architecture, deployment and troubleshooting
 
 ## Known limitations
 
-- Designed for fixed rooms of up to six people.
+- Designed for ten fixed rooms of up to ten people; simultaneous P2P HD sharing has significant client and upload costs.
 - Mobile browsers are suitable for viewing and chat, not primary screen sharing.
 - Safari and Firefox differ in screen and system-audio support.
 - No file/image transfer, message recall, audit log, user deletion UI or online-kick UI yet.

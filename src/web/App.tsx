@@ -10,11 +10,8 @@ import {
   useState,
 } from "react";
 import {
-  ROOM_TIER_DETAILS,
   SHARE_RESOLUTION_DETAILS,
   SHARE_QUALITY_MODES,
-  mediaModeAllowedForTier,
-  qualityModeAllowedForTier,
   shareSettingsForMode,
 } from "../shared/types";
 import type {
@@ -24,7 +21,6 @@ import type {
   PublicUser,
   QualityLevel,
   RoomSummary,
-  RoomTier,
   ShareSettings,
   ShareQualityMode,
 } from "../shared/types";
@@ -372,38 +368,14 @@ function Lobby({
         </div>
 
         {error && <p className="inline-alert">{error}</p>}
-        {(Object.keys(ROOM_TIER_DETAILS) as RoomTier[]).map((tierId) => {
-          const tier = ROOM_TIER_DETAILS[tierId];
-          const tierRooms = rooms.filter((room) => room.tier === tierId);
-          if (!tierRooms.length) return null;
-          return (
-            <section
-              className={`tier-section tier-section-${tierId}`}
-              key={tierId}
-            >
-              <header className="tier-heading">
-                <div>
-                  <span className={`tier-chip tier-chip-${tierId}`}>
-                    {tier.name}
-                  </span>
-                  <h2>{tier.name}房间</h2>
-                </div>
-                <p>{tier.description}</p>
-              </header>
-              <div className="room-grid">
-                {tierRooms.map((room) => {
-                  const index = tierRooms.findIndex(
-                    (candidate) => candidate.id === room.id,
-                  );
-                  return (
+        <div className="room-grid">
+          {rooms.map((room, index) => (
             <article
-              className={`room-card room-tone-${index + 1} tier-card-${tierId} ${room.available ? "" : "full"}`}
+              className={`room-card room-tone-${(index % 5) + 1} ${room.available ? "" : "full"}`}
               key={room.id}
             >
               <div className="room-card-head">
-                <span className="room-capacity">
-                  {tier.name} · {room.capacity} 人房
-                </span>
+                <span className="room-capacity">10 人房</span>
                 <span className={`room-status ${room.available ? "" : "is-full"}`}>
                   <i />
                   {room.available ? "可加入" : "已满"}
@@ -417,7 +389,9 @@ function Lobby({
                     </span>
                   ))}
                 </div>
-                <span className="room-index">0{index + 1}</span>
+                <span className="room-index">
+                  {String(index + 1).padStart(2, "0")}
+                </span>
               </div>
               <div className="room-card-foot">
                 <div>
@@ -448,12 +422,8 @@ function Lobby({
                 </small>
               </div>
             </article>
-                  );
-                })}
-              </div>
-            </section>
-          );
-        })}
+          ))}
+        </div>
 
         <div className="lobby-tip">
           <div className="tip-icon">
@@ -479,19 +449,16 @@ function SettingsMenu({
   settings,
   sharing,
   mediaMode,
-  roomTier,
   onChange,
 }: {
   settings: ShareSettings;
   sharing: boolean;
   mediaMode: RoomSummary["mediaMode"];
-  roomTier: RoomTier;
   onChange: (settings: ShareSettings) => void;
 }) {
-  const tier = ROOM_TIER_DETAILS[roomTier];
   const availableModes = (
     Object.keys(SHARE_QUALITY_MODES) as ShareQualityMode[]
-  ).filter((mode) => qualityModeAllowedForTier(roomTier, mode));
+  );
   const effectiveResolution = SHARE_RESOLUTION_DETAILS[settings.resolution];
   const degradationLabel =
     settings.degradationPreference === "maintain-resolution"
@@ -508,7 +475,7 @@ function SettingsMenu({
       </summary>
       <div className="settings-popover">
         <div className="popover-title">
-          <b>{tier.name}房 · 画质设置</b>
+          <b>画质设置</b>
           <span>
             {sharing
               ? mediaMode === "wtn"
@@ -517,14 +484,14 @@ function SettingsMenu({
               : "下次共享生效"}
           </span>
         </div>
-        <p className="tier-limit-note">
-          {tier.description}
+        <p className="quality-limit-note">
+          所有房间使用同一套标准画质
           <small>选择使用场景即可，系统自动匹配分辨率、帧率和码率</small>
         </p>
         <div className="quality-presets">
           {availableModes.map((mode) => {
             const profile = SHARE_QUALITY_MODES[mode];
-            const effective = shareSettingsForMode(roomTier, mode);
+            const effective = shareSettingsForMode(mode);
             return (
               <button
                 key={mode}
@@ -1399,7 +1366,6 @@ function RoomView({
     user,
     room.id,
     room.mediaMode,
-    room.tier,
     onSessionReplaced,
   );
   const [muted, setMuted] = useState(true);
@@ -1532,8 +1498,7 @@ function RoomView({
           <div className="room-title">
             <b>{room.name}</b>
             <span>
-              {ROOM_TIER_DETAILS[room.tier].name} · {session.participants.length}/
-              {room.capacity} 人 ·{" "}
+              {session.participants.length}/{room.capacity} 人 ·{" "}
               {room.mediaMode === "wtn" ? "火山 WTN" : "自建 P2P"}
             </span>
           </div>
@@ -1763,7 +1728,6 @@ function RoomView({
               settings={session.settings}
               sharing={Boolean(session.localStream)}
               mediaMode={session.mediaMode}
-              roomTier={room.tier}
               onChange={(settings) => void session.updateSettings(settings)}
             />
             <VoiceSettingsMenu
@@ -1950,10 +1914,10 @@ function AdminDialog({ onClose }: { onClose: () => void }) {
             </button>
             <div className="admin-room-modes">
               <div>
-                <h3>房间等级与媒体线路</h3>
+                <h3>房间媒体线路</h3>
                 <span>
                   {wtnEnabled
-                    ? "普通房固定自建；高级和极致房可选 WTN"
+                    ? "10 个房间均可独立选择自建或火山 WTN"
                     : "配置 WTN_APP_ID / WTN_APP_KEY 后可选择火山"}
                 </span>
               </div>
@@ -1961,9 +1925,7 @@ function AdminDialog({ onClose }: { onClose: () => void }) {
                 <label key={room.id}>
                   <span>
                     {room.name}
-                    <small>
-                      {ROOM_TIER_DETAILS[room.tier].name} · {room.occupants} 人在线
-                    </small>
+                    <small>{room.occupants} 人在线</small>
                   </span>
                   <select
                     value={room.mediaMode}
@@ -1976,13 +1938,7 @@ function AdminDialog({ onClose }: { onClose: () => void }) {
                     }
                   >
                     <option value="p2p">自建 P2P / TURN</option>
-                    <option
-                      value="wtn"
-                      disabled={
-                        !wtnEnabled ||
-                        !mediaModeAllowedForTier(room.tier, "wtn")
-                      }
-                    >
+                    <option value="wtn" disabled={!wtnEnabled}>
                       火山引擎 WTN
                     </option>
                   </select>
