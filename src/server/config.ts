@@ -40,6 +40,14 @@ const wtnTokenTtlSeconds = Math.min(
   Math.max(60, Number(process.env.WTN_TOKEN_TTL_SECONDS ?? 600)),
 );
 const wtnEnabled = Boolean(wtnAppId && wtnAppKey);
+const rtcAppId = process.env.RTC_APP_ID?.trim() ?? "";
+const rtcAppKey = process.env.RTC_APP_KEY?.trim() ?? "";
+const rtcBusinessId = process.env.RTC_BUSINESS_ID?.trim() ?? "";
+const rtcTokenTtlSeconds = Math.min(
+  86_400,
+  Math.max(300, Number(process.env.RTC_TOKEN_TTL_SECONDS ?? 7200)),
+);
+const rtcEnabled = Boolean(rtcAppId && rtcAppKey);
 
 export const appConfig = {
   port: Number(process.env.PORT ?? 3000),
@@ -62,12 +70,19 @@ export const appConfig = {
   turnSecret,
   turnCredentialTtlSeconds,
   wtnEnabled,
+  rtcEnabled,
   wtn: {
     appId: wtnAppId,
     appKey: wtnAppKey,
     businessId: wtnBusinessId,
     apiBaseUrl: wtnApiBaseUrl,
     tokenTtlSeconds: wtnTokenTtlSeconds,
+  },
+  rtc: {
+    appId: rtcAppId,
+    appKey: rtcAppKey,
+    businessId: rtcBusinessId,
+    tokenTtlSeconds: rtcTokenTtlSeconds,
   },
 };
 

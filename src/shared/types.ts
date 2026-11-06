@@ -12,11 +12,17 @@ export const ROOM_DEFINITIONS = [
 ] as const;
 
 export type RoomId = (typeof ROOM_DEFINITIONS)[number]["id"];
-export type MediaMode = "p2p" | "wtn";
+export type MediaMode = "p2p" | "wtn" | "rtc";
 export type WtnMediaKind = "screen" | "voice";
 export type WtnStreamQuality = "preview" | "hd";
+export const RTC_PREVIEW_USER_SUFFIX = "_preview";
 
 export const SHARE_RESOLUTION_DETAILS = {
+  "360p": {
+    width: 640,
+    height: 360,
+    display: "640×360",
+  },
   "720p": {
     width: 1280,
     height: 720,
@@ -52,6 +58,14 @@ export type ShareDegradationPreference =
   | "maintain-framerate";
 
 export const SHARE_QUALITY_MODES = {
+  lite: {
+    name: "轻量",
+    description: "低带宽、弱网和临时查看",
+    resolution: "360p",
+    frameRate: 15,
+    bitrateKbps: 800,
+    degradationPreference: "balanced",
+  },
   smooth: {
     name: "流畅",
     description: "聊天、普通浏览和低带宽网络",
@@ -114,6 +128,7 @@ export function shareSettingsForMode(
     frameRate: profile.frameRate,
     bitrateKbps: profile.bitrateKbps,
     degradationPreference: profile.degradationPreference,
+    systemAudioEnabled: false,
   };
 }
 
@@ -125,7 +140,8 @@ export function isValidShareSettings(settings: ShareSettings): boolean {
     settings.resolution === expected.resolution &&
     settings.frameRate === expected.frameRate &&
     settings.bitrateKbps === expected.bitrateKbps &&
-    settings.degradationPreference === expected.degradationPreference
+    settings.degradationPreference === expected.degradationPreference &&
+    typeof settings.systemAudioEnabled === "boolean"
   );
 }
 
@@ -158,6 +174,7 @@ export interface ShareSettings {
   bitrateKbps: number;
   resolution: ShareResolution;
   degradationPreference: ShareDegradationPreference;
+  systemAudioEnabled: boolean;
 }
 
 export interface ActiveShare {
@@ -186,6 +203,7 @@ export interface RtcIceServer {
 export interface ClientConfig {
   iceServers: RtcIceServer[];
   wtnEnabled: boolean;
+  rtcEnabled: boolean;
 }
 
 export interface WtnPublishResource {
@@ -200,6 +218,17 @@ export interface WtnSubscribeResource {
   token: string;
   streamId: string;
   quality?: WtnStreamQuality;
+}
+
+export type RtcTokenRole = "main" | "preview";
+
+export interface RtcTokenResource {
+  appId: string;
+  businessId: string;
+  roomId: string;
+  userId: string;
+  token: string;
+  expiresAt: number;
 }
 
 export type QualityLevel = "low" | "hd";

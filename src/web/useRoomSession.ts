@@ -23,6 +23,7 @@ import {
   type WtnPublisher,
   type WtnSubscription,
 } from "./wtn-client";
+import type { VolcRtcClient } from "./volc-rtc-client";
 
 const PREVIEW_BITRATE = 300_000;
 const VOICE_MAX_BITRATE = 48_000;
@@ -32,6 +33,8 @@ const SHARE_STOP_REMOVE_MS = 500;
 interface OutgoingPeer {
   pc: RTCPeerConnection;
   quality: QualityLevel;
+  audioSender?: RTCRtpSender;
+  audioTrack?: MediaStreamTrack;
   pendingQualityAck?: {
     to: string;
     quality: QualityLevel;
@@ -124,6 +127,7 @@ async function applySenderQuality(
   pc: RTCPeerConnection,
   quality: QualityLevel,
   settings: ShareSettings,
+  audio?: { sender: RTCRtpSender; track: MediaStreamTrack },
 ): Promise<boolean> {
   if (!pc.remoteDescription || pc.connectionState === "closed") return false;
   const sender = pc.getSenders().find((candidate) => candidate.track?.kind === "video");
@@ -148,16 +152,20 @@ async function applySenderQuality(
       : "maintain-resolution";
   try {
     await sender.setParameters(parameters);
-    return true;
   } catch {
     delete parameters.encodings[0].scaleResolutionDownBy;
     try {
       await sender.setParameters(parameters);
-      return true;
     } catch {
       return false;
     }
   }
+  await audio?.sender
+    .replaceTrack(
+      quality === "hd" && settings.systemAudioEnabled ? audio.track : null,
+    )
+    .catch(() => undefined);
+  return true;
 }
 
 function microphoneConstraints(deviceId: string): MediaTrackConstraints {
@@ -316,6 +324,10 @@ export function useRoomSession(
     (ownerId: string, quality: QualityLevel) => void
   >(() => undefined);
   const wtnVoiceTasksRef = useRef(new Map<string, Promise<void>>());
+  const rtcClientRef = useRef<VolcRtcClient | null>(null);
+  const rtcClientPromiseRef = useRef<Promise<VolcRtcClient | null> | null>(null);
+  const rtcOutputMutedRef = useRef(true);
+  const rtcOutputVolumeRef = useRef(1);
   const reconnectTimerRef = useRef<number | null>(null);
   const stopShareRef = useRef<() => void>(() => undefined);
   const recoverMicrophoneRef = useRef<() => void>(() => undefined);
@@ -345,6 +357,51 @@ export function useRoomSession(
     const socket = socketRef.current;
     if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(event));
   }, []);
+
+  const ensureRtcClient = useCallback(async () => {
+    if (mediaMode !== "rtc") return null;
+    if (rtcClientRef.current) return rtcClientRef.current;
+    if (rtcClientPromiseRef.current) return rtcClientPromiseRef.current;
+    rtcClientPromiseRef.current = import("./volc-rtc-client")
+      .then(({ VolcRtcClient: RtcClient }) => {
+        const client = new RtcClient(roomId, user.id, {
+          onRemoteScreen: (ownerId, stream, quality) => {
+            setRemoteStreams((current) => {
+              const next = { ...current };
+              if (stream) next[ownerId] = stream;
+              else delete next[ownerId];
+              return next;
+            });
+            setConfirmedQuality((current) => {
+              const next = { ...current };
+              if (stream) next[ownerId] = quality;
+              else delete next[ownerId];
+              return next;
+            });
+          },
+          onVoiceLevels: (levels) => setVoiceLevels(levels),
+          onVoicePeerState: (peerId, state) => {
+            setVoicePeerStates((current) => {
+              const next = { ...current };
+              if (state === "closed") delete next[peerId];
+              else next[peerId] = state;
+              return next;
+            });
+          },
+          onNotice: (message) => setNotice(message),
+          onConnectionState: () => undefined,
+        });
+        client.setOutputMuted(rtcOutputMutedRef.current);
+        client.setOutputVolume(rtcOutputVolumeRef.current);
+        rtcClientRef.current = client;
+        return client;
+      })
+      .catch((error) => {
+        rtcClientPromiseRef.current = null;
+        throw error;
+      });
+    return rtcClientPromiseRef.current;
+  }, [mediaMode, roomId, user.id]);
 
   const publishWtnScreenStreams = useCallback(
     async (stream: MediaStream, nextSettings: ShareSettings) => {
@@ -783,11 +840,15 @@ export function useRoomSession(
       if (ownerId === user.id) return;
       if (mediaMode === "wtn") {
         requestWtnScreenQuality(ownerId, quality);
+      } else if (mediaMode === "rtc") {
+        void ensureRtcClient().then((client) =>
+          client?.focusScreen(quality === "hd" ? ownerId : null),
+        );
       } else {
         send({ type: "quality.request", to: ownerId, quality });
       }
     },
-    [mediaMode, requestWtnScreenQuality, send, user.id],
+    [ensureRtcClient, mediaMode, requestWtnScreenQuality, send, user.id],
   );
 
   const closeVoicePeers = useCallback(() => {
@@ -802,6 +863,9 @@ export function useRoomSession(
     voicePendingCandidatesRef.current.clear();
     setVoiceStreams({});
     setVoicePeerStates({});
+    if (mediaMode === "rtc") {
+      void rtcClientRef.current?.stopVoice();
+    }
     if (mediaMode === "wtn") {
       for (const peerId of wtnVoiceSubscriptionsRef.current.keys()) {
         closeWtnVoiceSubscription(peerId);
@@ -819,7 +883,7 @@ export function useRoomSession(
     outgoingRef.current.clear();
     incomingRef.current.clear();
     pendingCandidatesRef.current.clear();
-    setRemoteStreams({});
+    if (mediaMode !== "rtc") setRemoteStreams({});
     closeVoicePeers();
     if (mediaMode === "wtn") closeWtnSubscriptions();
   }, [closeVoicePeers, closeWtnSubscriptions, mediaMode]);
@@ -835,13 +899,22 @@ export function useRoomSession(
       const outgoing: OutgoingPeer = { pc, quality: "low" };
       outgoingRef.current.set(viewerId, outgoing);
 
-      for (const track of stream.getTracks()) {
+      for (const track of stream.getVideoTracks()) {
         const transceiver = pc.addTransceiver(track, {
           direction: "sendonly",
           streams: [stream],
         });
         if (track.kind === "video") track.contentHint = "detail";
         transceiver.sender.track?.addEventListener("ended", () => pc.close());
+      }
+      const screenAudioTrack = stream.getAudioTracks()[0];
+      if (screenAudioTrack) {
+        const audioTransceiver = pc.addTransceiver("audio", {
+          direction: "sendonly",
+          streams: [stream],
+        });
+        outgoing.audioSender = audioTransceiver.sender;
+        outgoing.audioTrack = screenAudioTrack;
       }
 
       pc.onicecandidate = (event) => {
@@ -866,6 +939,12 @@ export function useRoomSession(
             pc,
             outgoing.quality,
             settingsRef.current,
+              outgoing.audioSender && outgoing.audioTrack
+                ? {
+                    sender: outgoing.audioSender,
+                    track: outgoing.audioTrack,
+                  }
+                : undefined,
           ).then((applied) => {
             const pending = outgoing.pendingQualityAck;
             if (!pending || outgoingRef.current.get(viewerId) !== outgoing) {
@@ -1091,6 +1170,10 @@ export function useRoomSession(
   );
 
   const syncVoicePeers = useCallback(() => {
+    if (mediaMode === "rtc") {
+      rtcClientRef.current?.syncVoice(remoteVoiceEnabledRef.current);
+      return;
+    }
     if (mediaMode === "wtn") {
       if (!voiceEnabledRef.current) {
         for (const peerId of wtnVoiceSubscriptionsRef.current.keys()) {
@@ -1243,13 +1326,34 @@ export function useRoomSession(
                   : participant,
             ),
           );
-          setShares(Object.fromEntries(event.shares.map((share) => [share.userId, share])));
+          const nextShares = Object.fromEntries(
+            event.shares.map((share) => [share.userId, share]),
+          );
+          setShares(nextShares);
           setConnectionState("connected");
           void loadMessages();
-          for (const participant of event.participants) {
-            if (participant.id !== user.id && localStreamRef.current) {
-              createOutgoingPeer(participant.id);
+          if (mediaMode === "p2p") {
+            for (const participant of event.participants) {
+              if (participant.id !== user.id && localStreamRef.current) {
+                createOutgoingPeer(participant.id);
+              }
             }
+          }
+          if (mediaMode === "rtc") {
+            void ensureRtcClient()
+              .then(async (client) => {
+                if (!client) return;
+                await client.initialize();
+                client.syncShares(event.shares);
+                client.syncVoice(remoteVoiceEnabledRef.current);
+              })
+              .catch((error) => {
+                setNotice(
+                  error instanceof Error
+                    ? error.message
+                    : "火山 RTC 连接失败",
+                );
+              });
           }
           syncVoicePeers();
           break;
@@ -1268,7 +1372,11 @@ export function useRoomSession(
             remoteVoiceEnabledRef.current.add(event.participant.id);
             syncVoicePeers();
           }
-          if (localStreamRef.current && event.participant.id !== user.id) {
+          if (
+            mediaMode === "p2p" &&
+            localStreamRef.current &&
+            event.participant.id !== user.id
+          ) {
             createOutgoingPeer(event.participant.id);
           }
           break;
@@ -1313,6 +1421,7 @@ export function useRoomSession(
               setShares((current) => {
                 const next = { ...current };
                 delete next[event.userId];
+                rtcClientRef.current?.syncShares(Object.values(next));
                 return next;
               });
               setRemoteStreams((current) => {
@@ -1339,7 +1448,13 @@ export function useRoomSession(
             window.clearTimeout(shareStopTimersRef.current.get(event.share.userId));
             shareStopTimersRef.current.delete(event.share.userId);
           }
-          setShares((current) => ({ ...current, [event.share.userId]: event.share }));
+          setShares((current) => {
+            const next = { ...current, [event.share.userId]: event.share };
+            if (mediaMode === "rtc") {
+              rtcClientRef.current?.syncShares(Object.values(next));
+            }
+            return next;
+          });
           setParticipants((current) =>
             current.map((participant) =>
               participant.id === event.share.userId
@@ -1351,9 +1466,13 @@ export function useRoomSession(
         case "share.updated":
           setShares((current) => {
             const share = current[event.userId];
-            return share
+            const next = share
               ? { ...current, [event.userId]: { ...share, settings: event.settings } }
               : current;
+            if (mediaMode === "rtc") {
+              rtcClientRef.current?.syncShares(Object.values(next));
+            }
+            return next;
           });
           if (mediaMode === "wtn" && event.userId !== user.id) {
             const desired = wtnScreenDesiredRef.current.get(event.userId);
@@ -1413,6 +1532,9 @@ export function useRoomSession(
               setShares((current) => {
                 const next = { ...current };
                 delete next[event.userId];
+                if (mediaMode === "rtc") {
+                  rtcClientRef.current?.syncShares(Object.values(next));
+                }
                 return next;
               });
               setParticipants((current) =>
@@ -1526,6 +1648,12 @@ export function useRoomSession(
                 outgoing.pc,
                 event.quality,
                 settingsRef.current,
+                outgoing.audioSender && outgoing.audioTrack
+                  ? {
+                      sender: outgoing.audioSender,
+                      track: outgoing.audioTrack,
+                    }
+                  : undefined,
               );
               if (outgoingRef.current.get(event.from) === outgoing && applied) {
                 outgoing.quality = event.quality;
@@ -1572,6 +1700,7 @@ export function useRoomSession(
       closeWtnScreenSubscription,
       closeWtnVoiceSubscription,
       createOutgoingPeer,
+      ensureRtcClient,
       handleIncomingOffer,
       handleIncomingVoiceOffer,
       loadMessages,
@@ -1673,8 +1802,12 @@ export function useRoomSession(
       if (micStream) for (const track of micStream.getTracks()) track.stop();
       const voicePublisher = wtnVoicePublisherRef.current;
       wtnVoicePublisherRef.current = null;
+      const rtcClient = rtcClientRef.current;
+      rtcClientRef.current = null;
+      rtcClientPromiseRef.current = null;
       void closeWtnScreenPublishers();
       if (voicePublisher) void voicePublisher.close();
+      if (rtcClient) void rtcClient.destroy();
       closeVoiceAudioContext();
     };
   }, [
@@ -1703,7 +1836,7 @@ export function useRoomSession(
             max: settingsRef.current.frameRate,
           },
         },
-        audio: true,
+        audio: settingsRef.current.systemAudioEnabled,
       });
       acquiredStream = stream;
       const video = stream.getVideoTracks()[0];
@@ -1725,6 +1858,10 @@ export function useRoomSession(
           stream,
           settingsRef.current,
         );
+      } else if (mediaMode === "rtc") {
+        const client = await ensureRtcClient();
+        if (!client) throw new Error("火山 RTC 尚未初始化");
+        await client.startScreen(stream, settingsRef.current);
       }
       localStreamRef.current = stream;
       localSnapshotRef.current = poster;
@@ -1750,18 +1887,27 @@ export function useRoomSession(
       if (acquiredStream) {
         for (const track of acquiredStream.getTracks()) track.stop();
       }
+      if (mediaMode === "rtc") void rtcClientRef.current?.stopScreen();
       setNotice(error instanceof Error ? error.message : "屏幕共享启动失败");
     } finally {
       shareStartingRef.current = false;
       setShareStarting(false);
     }
-  }, [createOutgoingPeer, mediaMode, publishWtnScreenStreams, send, user.id]);
+  }, [
+    createOutgoingPeer,
+    ensureRtcClient,
+    mediaMode,
+    publishWtnScreenStreams,
+    send,
+    user.id,
+  ]);
 
   const stopShare = useCallback(() => {
     send({ type: "share.stopped" });
     for (const { pc } of outgoingRef.current.values()) pc.close();
     outgoingRef.current.clear();
     void closeWtnScreenPublishers();
+    if (mediaMode === "rtc") void rtcClientRef.current?.stopScreen();
     const stream = localStreamRef.current;
     if (stream) for (const track of stream.getTracks()) track.stop();
     localStreamRef.current = null;
@@ -1772,13 +1918,14 @@ export function useRoomSession(
         participant.id === user.id ? { ...participant, isSharing: false } : participant,
       ),
     );
-  }, [closeWtnScreenPublishers, send, user.id]);
+  }, [closeWtnScreenPublishers, mediaMode, send, user.id]);
   useEffect(() => {
     stopShareRef.current = stopShare;
   }, [stopShare]);
 
   const updateSettings = useCallback(
     async (next: ShareSettings) => {
+      const previousSettings = settingsRef.current;
       setSettings(next);
       settingsRef.current = next;
       const stream = localStreamRef.current;
@@ -1791,6 +1938,23 @@ export function useRoomSession(
             frameRate: { ideal: next.frameRate, max: next.frameRate },
           })
           .catch(() => undefined);
+      }
+      if (mediaMode === "rtc") {
+        try {
+          await rtcClientRef.current?.updateScreen(next);
+          send({ type: "share.updated", settings: next });
+        } catch (error) {
+          setSettings(previousSettings);
+          settingsRef.current = previousSettings;
+          setNotice(
+            `${
+              error instanceof Error
+                ? error.message
+                : "火山 RTC 屏幕参数更新失败"
+            }，已保留原编码参数`,
+          );
+        }
+        return;
       }
       if (mediaMode === "wtn") {
         const generation = ++wtnScreenPublishGenerationRef.current;
@@ -1834,7 +1998,17 @@ export function useRoomSession(
       }
       send({ type: "share.updated", settings: next });
       for (const outgoing of outgoingRef.current.values()) {
-        await applySenderQuality(outgoing.pc, outgoing.quality, next);
+        await applySenderQuality(
+          outgoing.pc,
+          outgoing.quality,
+          next,
+          outgoing.audioSender && outgoing.audioTrack
+            ? {
+                sender: outgoing.audioSender,
+                track: outgoing.audioTrack,
+              }
+            : undefined,
+        );
       }
     },
     [mediaMode, publishWtnScreenStreams, send],
@@ -1848,21 +2022,29 @@ export function useRoomSession(
     }
     setVoiceJoining(true);
     try {
-      await ensureVoiceAudioContext();
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: microphoneConstraints(selectedMicrophoneId),
-        video: false,
-      });
-      await configureVoiceInput(stream, selectedMicrophoneId);
-      if (mediaMode === "wtn") {
-        const resource = await api.wtnPublish("voice");
-        wtnVoicePublisherRef.current = await publishToWtn(
-          voiceSendStreamRef.current ?? stream,
-          "voice",
-          undefined,
-          settingsRef.current,
-          resource,
-        );
+      if (mediaMode === "rtc") {
+        const client = await ensureRtcClient();
+        if (!client) throw new Error("火山 RTC 尚未初始化");
+        await client.initialize();
+        await client.startVoice(selectedMicrophoneId);
+        client.setInputGain(voiceInputGainRef.current);
+      } else {
+        await ensureVoiceAudioContext();
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: microphoneConstraints(selectedMicrophoneId),
+          video: false,
+        });
+        await configureVoiceInput(stream, selectedMicrophoneId);
+        if (mediaMode === "wtn") {
+          const resource = await api.wtnPublish("voice");
+          wtnVoicePublisherRef.current = await publishToWtn(
+            voiceSendStreamRef.current ?? stream,
+            "voice",
+            undefined,
+            settingsRef.current,
+            resource,
+          );
+        }
       }
       voiceEnabledRef.current = true;
       voiceMutedRef.current = false;
@@ -1883,7 +2065,11 @@ export function useRoomSession(
         for (const track of stream.getTracks()) track.stop();
         micStreamRef.current = null;
       }
-      closeVoiceAudioContext();
+      if (mediaMode === "rtc") {
+        void rtcClientRef.current?.stopVoice();
+      } else {
+        closeVoiceAudioContext();
+      }
       setNotice(microphoneErrorMessage(error));
     } finally {
       setVoiceJoining(false);
@@ -1892,6 +2078,7 @@ export function useRoomSession(
     closeVoiceAudioContext,
     configureVoiceInput,
     ensureVoiceAudioContext,
+    ensureRtcClient,
     mediaMode,
     selectedMicrophoneId,
     send,
@@ -1934,6 +2121,9 @@ export function useRoomSession(
     const nextMuted = !voiceMutedRef.current;
     voiceMutedRef.current = nextMuted;
     setVoiceMuted(nextMuted);
+    if (mediaMode === "rtc") {
+      rtcClientRef.current?.setVoiceMuted(nextMuted);
+    }
     const micTrack = micStreamRef.current?.getAudioTracks()[0];
     if (micTrack) micTrack.enabled = !nextMuted;
     const sendTrack = voiceSendStreamRef.current?.getAudioTracks()[0];
@@ -1946,18 +2136,25 @@ export function useRoomSession(
           : participant,
       ),
     );
-  }, [send, user.id]);
+  }, [mediaMode, send, user.id]);
 
   const switchMicrophone = useCallback(
     async (deviceId: string) => {
       if (!voiceEnabledRef.current || voiceSwitching) return;
       setVoiceSwitching(true);
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: microphoneConstraints(deviceId),
-          video: false,
-        });
-        await configureVoiceInput(stream, deviceId);
+        if (mediaMode === "rtc") {
+          const client = rtcClientRef.current;
+          if (!client) throw new Error("火山 RTC 尚未初始化");
+          await client.switchMicrophone(deviceId);
+          setSelectedMicrophoneId(deviceId);
+        } else {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            audio: microphoneConstraints(deviceId),
+            video: false,
+          });
+          await configureVoiceInput(stream, deviceId);
+        }
       } catch (error) {
         setNotice(microphoneErrorMessage(error));
         const currentTrack = micStreamRef.current?.getAudioTracks()[0];
@@ -1971,7 +2168,7 @@ export function useRoomSession(
         setVoiceSwitching(false);
       }
     },
-    [configureVoiceInput, voiceSwitching],
+    [configureVoiceInput, mediaMode, voiceSwitching],
   );
   recoverMicrophoneRef.current = () => {
     void switchMicrophone("");
@@ -1986,11 +2183,19 @@ export function useRoomSession(
     if (gain && context) {
       gain.gain.setTargetAtTime(next, context.currentTime, 0.03);
     }
-  }, []);
+    if (mediaMode === "rtc") rtcClientRef.current?.setInputGain(next);
+  }, [mediaMode]);
 
   const setVoiceOutputVolume = useCallback((value: number) => {
     const next = Math.max(0, Math.min(1, value));
+    rtcOutputVolumeRef.current = next;
     setVoiceOutputVolumeState(next);
+    if (mediaMode === "rtc") rtcClientRef.current?.setOutputVolume(next);
+  }, [mediaMode]);
+
+  const setRtcOutputMuted = useCallback((muted: boolean) => {
+    rtcOutputMutedRef.current = muted;
+    rtcClientRef.current?.setOutputMuted(muted);
   }, []);
 
   const focusShare = useCallback(
@@ -2049,6 +2254,7 @@ export function useRoomSession(
     switchMicrophone,
     setVoiceInputGain,
     setVoiceOutputVolume,
+    setRtcOutputMuted,
     refreshVoiceInputDevices,
     focusShare,
     requestQuality,

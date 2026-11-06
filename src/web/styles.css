@@ -1225,6 +1225,42 @@ select:focus {
   margin: 0;
 }
 
+.system-audio-toggle {
+  display: flex !important;
+  grid-template-columns: none !important;
+  align-items: flex-start;
+  gap: 0.55rem !important;
+  padding: 0.65rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.025);
+  cursor: pointer;
+}
+
+.system-audio-toggle input {
+  width: 16px;
+  height: 16px;
+  min-height: 16px;
+  margin: 0.12rem 0 0;
+  accent-color: var(--accent);
+}
+
+.system-audio-toggle span {
+  display: grid;
+  gap: 0.18rem;
+}
+
+.system-audio-toggle b {
+  color: var(--cream);
+  font-size: 0.66rem;
+}
+
+.system-audio-toggle small {
+  color: #7d8490;
+  font-size: 0.56rem;
+  line-height: 1.5;
+}
+
 .settings-popover label {
   font-size: 0.68rem;
 }

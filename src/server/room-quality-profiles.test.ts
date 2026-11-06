@@ -18,6 +18,9 @@ describe("rooms and screen-quality profiles", () => {
 
   it("accepts every standardized quality profile", () => {
     expect(
+      isValidShareSettings(shareSettingsForMode("lite")),
+    ).toBe(true);
+    expect(
       isValidShareSettings(shareSettingsForMode("smooth")),
     ).toBe(true);
     expect(
@@ -48,6 +51,12 @@ describe("rooms and screen-quality profiles", () => {
       isValidShareSettings({
         ...shareSettingsForMode("gaming"),
         frameRate: 30,
+      }),
+    ).toBe(false);
+    expect(
+      isValidShareSettings({
+        ...shareSettingsForMode("standard"),
+        systemAudioEnabled: "yes" as unknown as boolean,
       }),
     ).toBe(false);
   });

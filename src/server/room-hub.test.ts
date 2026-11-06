@@ -43,12 +43,13 @@ describe("room hub", () => {
   });
 
   it("stores an independent media mode for each room", () => {
-    const hub = new RoomHub({ "room-2": "wtn" });
+    const hub = new RoomHub({ "room-2": "wtn", "room-3": "rtc" });
     expect(hub.roomSummaries()[0].mediaMode).toBe("p2p");
     expect(hub.roomSummaries()[1].mediaMode).toBe("wtn");
+    expect(hub.roomSummaries()[2].mediaMode).toBe("rtc");
 
-    expect(hub.setRoomMediaMode("room-1", "wtn")).toBe(true);
-    expect(hub.roomSummaries()[0].mediaMode).toBe("wtn");
+    expect(hub.setRoomMediaMode("room-1", "rtc")).toBe(true);
+    expect(hub.roomSummaries()[0].mediaMode).toBe("rtc");
   });
 
   it("allows only one screen share per user and relays starts to others", () => {

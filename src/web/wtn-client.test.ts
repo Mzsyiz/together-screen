@@ -10,6 +10,7 @@ describe("WTN screen encoding", () => {
       frameRate: 30,
       bitrateKbps: 20_000,
       degradationPreference: "maintain-resolution",
+      systemAudioEnabled: false,
     };
 
     expect(wtnScreenSendEncoding("preview", settings, 2160)).toEqual({
@@ -26,6 +27,7 @@ describe("WTN screen encoding", () => {
       frameRate: 30,
       bitrateKbps: 8000,
       degradationPreference: "maintain-resolution",
+      systemAudioEnabled: false,
     };
     expect(wtnScreenSendEncoding("hd", twoK, 1440)).toEqual({
       scaleResolutionDownBy: 1,
@@ -39,6 +41,7 @@ describe("WTN screen encoding", () => {
       frameRate: 30,
       bitrateKbps: 20_000,
       degradationPreference: "maintain-resolution",
+      systemAudioEnabled: false,
     };
     expect(wtnScreenSendEncoding("hd", fourK, 2160)).toEqual({
       scaleResolutionDownBy: 1,

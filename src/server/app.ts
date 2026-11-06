@@ -8,6 +8,7 @@ import type {
   MediaMode,
   PublicUser,
   RoomId,
+  RtcTokenRole,
   WtnMediaKind,
   WtnStreamQuality,
 } from "../shared/types.js";
@@ -31,6 +32,7 @@ import {
   createWtnPublishStreamId,
   createWtnResource,
 } from "./wtn.js";
+import { createRtcToken } from "./rtc.js";
 
 const ROOM_IDS = new Set<string>(ROOM_DEFINITIONS.map((room) => room.id));
 function isRoomId(roomId: string): roomId is RoomId {
@@ -118,6 +120,7 @@ export async function buildApp() {
     return {
       iceServers: iceServersForUser(user.id),
       wtnEnabled: appConfig.wtnEnabled,
+      rtcEnabled: appConfig.rtcEnabled,
     };
   });
 
@@ -315,6 +318,31 @@ export async function buildApp() {
     });
   });
 
+  app.post<{ Body: { role?: RtcTokenRole } }>(
+    "/api/rtc/token",
+    async (request, reply) => {
+      const user = requireUser(database, request, reply, activeClients);
+      if (!user) return reply;
+      if (!appConfig.rtcEnabled) {
+        return reply.code(503).send({ error: "火山 RTC 尚未配置" });
+      }
+      const room = rooms.roomForUser(user.id);
+      if (!room || room.mediaMode !== "rtc") {
+        return reply.code(409).send({ error: "当前房间未启用火山 RTC" });
+      }
+      const role = request.body?.role ?? "main";
+      if (role !== "main" && role !== "preview") {
+        return reply.code(400).send({ error: "RTC 凭证类型不合法" });
+      }
+      return createRtcToken({
+        config: appConfig.rtc,
+        roomId: room.id,
+        userId: user.id,
+        role,
+      });
+    },
+  );
+
   app.get<{ Params: { roomId: string }; Querystring: { limit?: string } }>(
     "/api/rooms/:roomId/messages",
     async (request, reply) => {
@@ -364,6 +392,7 @@ export async function buildApp() {
     return {
       rooms: rooms.roomSummaries(),
       wtnEnabled: appConfig.wtnEnabled,
+      rtcEnabled: appConfig.rtcEnabled,
     };
   });
 
@@ -375,11 +404,14 @@ export async function buildApp() {
     if (!admin) return reply;
     const roomId = request.params.roomId;
     const mode = request.body?.mode;
-    if (!isRoomId(roomId) || (mode !== "p2p" && mode !== "wtn")) {
+    if (!isRoomId(roomId) || (mode !== "p2p" && mode !== "wtn" && mode !== "rtc")) {
       return reply.code(400).send({ error: "房间或媒体模式不合法" });
     }
     if (mode === "wtn" && !appConfig.wtnEnabled) {
       return reply.code(409).send({ error: "火山 WTN 尚未配置" });
+    }
+    if (mode === "rtc" && !appConfig.rtcEnabled) {
+      return reply.code(409).send({ error: "火山 RTC 尚未配置" });
     }
     const summary = rooms.roomSummaries().find((room) => room.id === roomId);
     if (!summary) {

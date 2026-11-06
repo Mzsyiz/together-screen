@@ -6,6 +6,8 @@ import type {
   PublicUser,
   RoomId,
   RoomSummary,
+  RtcTokenResource,
+  RtcTokenRole,
   WtnMediaKind,
   WtnPublishResource,
   WtnStreamQuality,
@@ -71,7 +73,11 @@ export const api = {
     }),
   adminUsers: () => request<{ users: PublicUser[] }>("/api/admin/users"),
   adminRooms: () =>
-    request<{ rooms: RoomSummary[]; wtnEnabled: boolean }>("/api/admin/rooms"),
+    request<{
+      rooms: RoomSummary[];
+      wtnEnabled: boolean;
+      rtcEnabled: boolean;
+    }>("/api/admin/rooms"),
   updateRoomMedia: (roomId: RoomId, mode: MediaMode) =>
     request<{ room: RoomSummary }>(`/api/admin/rooms/${roomId}/media`, {
       method: "PUT",
@@ -100,5 +106,10 @@ export const api = {
     request<WtnSubscribeResource>("/api/wtn/subscribe", {
       method: "POST",
       body: JSON.stringify({ ownerId, kind, quality }),
+    }),
+  rtcToken: (role: RtcTokenRole) =>
+    request<RtcTokenResource>("/api/rtc/token", {
+      method: "POST",
+      body: JSON.stringify({ role }),
     }),
 };

@@ -102,8 +102,31 @@ export class AppDatabase {
 
       CREATE TABLE IF NOT EXISTS room_media_settings (
         room_id TEXT PRIMARY KEY,
-        media_mode TEXT NOT NULL CHECK (media_mode IN ('p2p', 'wtn'))
+        media_mode TEXT NOT NULL CHECK (media_mode IN ('p2p', 'wtn', 'rtc'))
       );
+    `);
+    this.migrateRoomMediaModeConstraint();
+  }
+
+  private migrateRoomMediaModeConstraint() {
+    const row = this.db
+      .prepare(
+        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'room_media_settings'",
+      )
+      .get() as { sql?: string } | undefined;
+    if (row?.sql?.includes("'rtc'")) return;
+
+    this.db.exec(`
+      BEGIN;
+      ALTER TABLE room_media_settings RENAME TO room_media_settings_legacy;
+      CREATE TABLE room_media_settings (
+        room_id TEXT PRIMARY KEY,
+        media_mode TEXT NOT NULL CHECK (media_mode IN ('p2p', 'wtn', 'rtc'))
+      );
+      INSERT INTO room_media_settings (room_id, media_mode)
+      SELECT room_id, media_mode FROM room_media_settings_legacy;
+      DROP TABLE room_media_settings_legacy;
+      COMMIT;
     `);
   }
 

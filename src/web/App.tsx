@@ -27,6 +27,12 @@ import type {
 import { api, ApiError } from "./api";
 import { useRoomSession } from "./useRoomSession";
 
+function mediaModeLabel(mode: RoomSummary["mediaMode"]): string {
+  if (mode === "rtc") return "火山 RTC";
+  if (mode === "wtn") return "火山 WTN";
+  return "自建 P2P";
+}
+
 type IconName =
   | "screen"
   | "grid"
@@ -398,7 +404,7 @@ function Lobby({
                   <h3>{room.name}</h3>
                   <p>
                     最多 {room.capacity} 人 ·{" "}
-                    {room.mediaMode === "wtn" ? "火山 WTN" : "自建 P2P"}
+                    {mediaModeLabel(room.mediaMode)}
                   </p>
                 </div>
                 <button
@@ -480,6 +486,8 @@ function SettingsMenu({
             {sharing
               ? mediaMode === "wtn"
                 ? "WTN 将重新发布"
+                : mediaMode === "rtc"
+                  ? "RTC 编码参数实时生效"
                 : "实时生效"
               : "下次共享生效"}
           </span>
@@ -497,7 +505,12 @@ function SettingsMenu({
                 key={mode}
                 type="button"
                 className={settings.qualityMode === mode ? "active" : ""}
-                onClick={() => onChange(effective)}
+                onClick={() =>
+                  onChange({
+                    ...effective,
+                    systemAudioEnabled: settings.systemAudioEnabled,
+                  })
+                }
               >
                 <b>{profile.name}</b>
                 <span>{profile.description}</span>
@@ -525,6 +538,27 @@ function SettingsMenu({
           “标准”是默认推荐：优先保持文字和界面清晰。实际编码参数仍受屏幕源、
           浏览器性能和网络状况影响。
         </p>
+        <label className="system-audio-toggle">
+          <input
+            type="checkbox"
+            checked={settings.systemAudioEnabled}
+            disabled={sharing}
+            onChange={(event) =>
+              onChange({
+                ...settings,
+                systemAudioEnabled: event.target.checked,
+              })
+            }
+          />
+          <span>
+            <b>共享屏幕系统声音</b>
+            <small>
+              {sharing
+                ? "共享过程中不能改变系统声音，请先停止共享"
+                : "默认关闭；仅在你主动开启后，观看者点击高清画面才会播放"}
+            </small>
+          </span>
+        </label>
       </div>
     </details>
   );
@@ -579,7 +613,9 @@ function VoiceSettingsMenu({
             <div>
               <b>加入房间语音</b>
               <span>
-                {session.mediaMode === "wtn"
+                {session.mediaMode === "rtc"
+                  ? "通过火山 RTC 传输，麦克风与屏幕预览、高清切换完全独立"
+                  : session.mediaMode === "wtn"
                   ? "通过火山引擎 WTN 发布和订阅语音"
                   : "使用 WebRTC 点对点传输，不经过业务服务器"}
               </span>
@@ -1373,6 +1409,10 @@ function RoomView({
   const stageRef = useRef<HTMLElement>(null);
   const previousShareIdsRef = useRef("");
 
+  useEffect(() => {
+    session.setRtcOutputMuted(muted);
+  }, [muted, session.setRtcOutputMuted]);
+
   const ownShare = useMemo<ActiveShare | null>(
     () =>
       session.localStream
@@ -1499,7 +1539,7 @@ function RoomView({
             <b>{room.name}</b>
             <span>
               {session.participants.length}/{room.capacity} 人 ·{" "}
-              {room.mediaMode === "wtn" ? "火山 WTN" : "自建 P2P"}
+              {mediaModeLabel(room.mediaMode)}
             </span>
           </div>
         </div>
@@ -1789,6 +1829,7 @@ function AdminDialog({ onClose }: { onClose: () => void }) {
   const [users, setUsers] = useState<PublicUser[]>([]);
   const [rooms, setRooms] = useState<RoomSummary[]>([]);
   const [wtnEnabled, setWtnEnabled] = useState(false);
+  const [rtcEnabled, setRtcEnabled] = useState(false);
   const [roomBusy, setRoomBusy] = useState<string | null>(null);
   const [form, setForm] = useState({
     username: "",
@@ -1808,6 +1849,7 @@ function AdminDialog({ onClose }: { onClose: () => void }) {
       setUsers(userResult.users);
       setRooms(roomResult.rooms);
       setWtnEnabled(roomResult.wtnEnabled);
+      setRtcEnabled(roomResult.rtcEnabled);
     } catch (loadError) {
       setError(
         loadError instanceof Error ? loadError.message : "管理数据加载失败",
@@ -1916,9 +1958,9 @@ function AdminDialog({ onClose }: { onClose: () => void }) {
               <div>
                 <h3>房间媒体线路</h3>
                 <span>
-                  {wtnEnabled
-                    ? "10 个房间均可独立选择自建或火山 WTN"
-                    : "配置 WTN_APP_ID / WTN_APP_KEY 后可选择火山"}
+                  {rtcEnabled || wtnEnabled
+                    ? "10 个房间均可独立选择自建、火山 RTC 或 WTN"
+                    : "配置火山 RTC 或 WTN 凭证后可在房间中切换线路"}
                 </span>
               </div>
               {rooms.map((room) => (
@@ -1940,6 +1982,9 @@ function AdminDialog({ onClose }: { onClose: () => void }) {
                     <option value="p2p">自建 P2P / TURN</option>
                     <option value="wtn" disabled={!wtnEnabled}>
                       火山引擎 WTN
+                    </option>
+                    <option value="rtc" disabled={!rtcEnabled}>
+                      火山引擎 RTC
                     </option>
                   </select>
                 </label>
