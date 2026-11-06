@@ -10,15 +10,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ### Added
 
-- Per-room administrator-selected P2P/TURN or Volcengine WTN media transport.
+- Added Volcengine RTC as a third per-room media transport beside P2P/TURN and WTN.
+- Added server-issued room/user-scoped short-lived RTC tokens without exposing `RTC_APP_KEY`.
+- Added an independent 360p video-only RTC preview and a click-to-subscribe main screen stream with optional shared system audio.
+- Added a separate RTC microphone stream; changing 360p, 720p, 1080p, 2K or 4K never reconnects voice.
+- Shared system audio is now off by default, and microphone mute never changes screen-audio capture.
+- Added a 360p Lite quality profile.
 - Replaced tiered rooms with ten identical rooms, each supporting up to 10 participants.
 - Server-signed short-lived WTN JWTs and browser WHIP/WHEP publishing/subscribing.
 - Complete P2P room voice controls, devices, gain, levels, output volume and speaking indicators.
-- Standardized screen quality around 720p, 1080p, 2K/1440p and 4K/2160p profiles.
-- Exposed Smooth, Standard, HD, Ultra, Gaming and 4K profiles in every room.
-- Replaced arbitrary encoder controls with Smooth, Standard, HD, Ultra, Gaming and 4K profiles; Standard is the default at 1080p/15 FPS/2.5 Mbps.
+- Exposed Lite, Smooth, Standard, HD, Ultra, Gaming and 4K profiles in every room; Standard remains the default at 1080p/15 FPS/2.5 Mbps.
 - Optimized voice with Opus preference, a 48 Kbps cap, real-time priority and automatic default-microphone recovery after device loss.
-- Architecture, deployment, troubleshooting and open-source contribution documentation.
+- Bilingual architecture, deployment, troubleshooting, media-transport, Baota offline-update and contribution documentation.
 - GitHub CI, Issue templates, Pull Request template and Dependabot configuration.
 
 ### Changed
@@ -27,6 +30,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - Remote shares now autoplay their lightweight preview on entry; the latest-frame cache is only a connection and switch fallback.
 - Settings popovers now escape the bottom control bar clipping context.
 - Docker configuration now forwards TURN shared-secret and proxy/session settings.
+- README content now reflects the current ten ten-person rooms, three media transports and seven quality profiles.
 
 ### Fixed
 

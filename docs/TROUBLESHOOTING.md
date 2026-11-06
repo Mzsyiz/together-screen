@@ -56,15 +56,16 @@ If the card says “Switching to HD” for too long, the sender may not support 
 
 Static desktop content produces low measured bitrate because the encoder compresses unchanged frames efficiently. Test motion or gaming content separately before buying more bandwidth.
 
-Choose a standardized WTN profile by content:
+Choose a standardized profile by content:
 
+- Lite for constrained-network monitoring;
 - Standard for office, web, documents and code;
 - HD for software demos, animation and video;
 - Ultra for detailed 2K desktops;
 - Gaming for games and fast movement;
-- 4K for 4K presentations in Ultimate rooms only.
+- 4K for presentations with a genuine 4K source and sufficient upload.
 
-If the badge says 4K but the image is still soft, verify that the browser capture source is actually 4K instead of an upscaled low-resolution window. In P2P rooms, 4K significantly increases the sharer's upload to every viewer; WTN is primarily limited by sharer upload and Volcengine plan limits.
+If the badge says 4K but the image is still soft, verify that the browser capture source is actually 4K instead of an upscaled low-resolution window. In P2P rooms, 4K significantly increases the sharer's upload to every viewer; RTC/WTN rooms are also limited by the selected profile, sender upload and cloud plan specifications.
 
 ## Video is delayed or stutters
 
@@ -78,7 +79,7 @@ Possible causes:
 
 Try:
 
-- lower the resolution or use the省带宽 preset;
+- lower the resolution or use the Lite preset;
 - request HD for one share at a time;
 - close other tabs using video capture;
 - use a wired connection;
@@ -138,6 +139,23 @@ The browser must never receive `WTN_APP_KEY`. If a WTN request fails, use the re
 WTN screen quality no longer depends on `RID`. Every share creates two independent StreamIDs; their request paths contain `_screen_preview` and `_screen_hd`. Entering the room should automatically show “Preview · Autoplay”; a click should show “Switching to HD”, and the HD badge should appear only after the independent HD subscription succeeds. If the HD subscription fails, the viewer remains on preview and receives the error. Server logs or the Network panel should show the HD publish and subscribe requests.
 
 If preview works but HD never appears, check that the second screen publish request succeeded, that the WTN application permits two streams from the same user, and that the room has not reached a WTN concurrency limit. Do not paste full JWTs into public Issues.
+
+## Volcengine RTC fails
+
+Check:
+
+- `RTC_APP_ID` and `RTC_APP_KEY` are configured in `.env`;
+- the AppID and AppKey belong to the same RTC application and RTC is enabled;
+- server time is accurate and tokens have not expired;
+- the empty room is set to “火山引擎 RTC” in Admin Center;
+- `/api/rtc/token` returns 200 in the browser Network panel and never contains the AppKey;
+- the browser can reach Volcengine RTC signaling and media domains.
+
+If preview works but click-to-HD does not, inspect RTC screen publish events, browser encoding support and whether the selected 2K/4K profile is supported by the capture device. Preview never plays system audio; audio is subscribed only when the sharer enabled it and the viewer selects HD.
+
+Microphone mute changes only local main-stream capture volume and must not stop shared system audio. Changing 360p, 720p, 1080p, 2K or 4K updates only the screen encoder and must not rejoin the room or republish voice. Do not paste full RTC tokens or AppKeys into public Issues.
+
+If an RTC room shows video but no shared audio, confirm that the sharer enabled “Share system audio” before starting the share. Changing this while sharing requires stopping and restarting. Microphone voice and shared system audio are independent paths.
 
 ## Settings popovers do not appear
 

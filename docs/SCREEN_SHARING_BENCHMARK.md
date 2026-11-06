@@ -26,12 +26,15 @@ This page records only parameters supported by public vendor documentation. Bitr
 
 | Mode | Parameters | Intended use |
 | --- | --- | --- |
+| Lite | 360p / 15 FPS / 0.8 Mbps | Constrained networks and minimum bandwidth |
 | Smooth | 720p / 10 FPS / 1.5 Mbps | Chat, browsing and constrained networks |
 | Standard | 1080p / 15 FPS / 2.5 Mbps | Office, web, documents and code |
 | HD | 1080p / 30 FPS / 4 Mbps | Software demos, animation and video |
 | Ultra | 1440p / 30 FPS / 8 Mbps | Detailed desktops and high-resolution content |
 | Gaming | 1080p / 60 FPS / 8 Mbps | Games and fast movement |
 | 4K | 2160p / 30 FPS / 20 Mbps | 4K presentations |
+
+Every room exposes the same seven profiles, with Standard as the default. Bitrates are caps, not fixed consumption.
 
 ## Official sources
 

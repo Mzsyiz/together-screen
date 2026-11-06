@@ -53,6 +53,8 @@ For UI or WebRTC changes, also test with two independent browser contexts. When 
 - poster, preview and confirmed HD states;
 - pointer leave and browser focus changes;
 - simultaneous shares;
+- RTC/WTN autoplay preview, click-to-HD and system-audio toggle;
+- voice remaining connected while screen quality changes;
 - voice join, mute, device state and reconnect;
 - desktop and narrow layouts.
 
@@ -99,7 +101,7 @@ Never commit:
 
 - `.env` files;
 - TURN shared secrets or static credentials;
-- WTN `AppKey` or reusable WTN JWTs;
+- WTN/RTC AppKeys, full tokens or reusable JWTs;
 - SQLite databases;
 - cookies and session tokens;
 - WebRTC diagnostic dumps;

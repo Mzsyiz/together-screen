@@ -7,7 +7,7 @@ English | [简体中文](DEVELOPMENT.zh-CN.md)
 - React 19 and Vite for the web client;
 - Fastify and WebSocket for API and signaling;
 - SQLite through Node.js `DatabaseSync`;
-- WebRTC for screen sharing and voice;
+- WebRTC, Volcengine RTC and WTN for screen sharing and voice;
 - Vitest for server-side tests;
 - TypeScript strict mode across client, server and shared protocols.
 
@@ -35,12 +35,16 @@ src/
 │   ├── config.ts          environment and ICE server construction
 │   ├── db.ts              SQLite schema and queries
 │   ├── room-hub.ts        in-memory rooms and signaling relay
+│   ├── rtc.ts             Volcengine RTC token generation
+│   ├── wtn.ts             Volcengine WTN JWTs and resource URLs
 │   └── cli/               admin CLI commands
 ├── shared/
 │   └── types.ts           shared REST/WebSocket/media types
 └── web/
     ├── App.tsx            application screens and room UI
     ├── useRoomSession.ts  WebRTC, signaling and voice lifecycle
+    ├── volc-rtc-client.ts Volcengine RTC dual-stream client
+    ├── wtn-client.ts      WTN WHIP/WHEP client
     ├── api.ts             browser API client and client ID
     └── styles.css         responsive application styles
 ```
@@ -56,6 +60,15 @@ When changing signaling:
 5. Test the client with two independent browser contexts.
 
 For sender-controlled media changes, use an acknowledgement path instead of changing only local UI state.
+
+When adding a room media mode, update:
+
+- `MediaMode` in `src/shared/types.ts`;
+- the SQLite `room_media_settings` constraint and migration;
+- `/api/config`, admin room responses and media-mode update routes;
+- `useRoomSession.ts` and the matching media client;
+- admin UI plus room-card and room-header labels;
+- bilingual documentation, migration tests and a real two-browser test.
 
 ## WebRTC debugging
 
@@ -95,6 +108,16 @@ For layout changes, verify:
 
 Screen and voice changes require two independent browser contexts with separate accounts.
 
+Additional RTC checks:
+
+- `/api/rtc/token` returns only short-lived tokens, never the AppKey;
+- a new viewer receives an autoplaying preview;
+- clicking switches to the main screen and unfocusing returns to preview;
+- changing quality does not republish microphone audio;
+- microphone mute does not mute shared system audio;
+- with shared system audio disabled, neither preview nor HD plays it;
+- with it enabled, preview remains silent and focused HD plays it.
+
 ## Data safety
 
 Tests must use temporary database directories and must not modify a development or production database. Do not add seed users with real passwords.
@@ -104,6 +127,7 @@ Tests must use temporary database directories and must not modify a development 
 Update the relevant file when behavior changes:
 
 - `README.md`: user-facing overview and setup;
+- `docs/MEDIA_TRANSPORTS.md`: transport selection, cost and audio rules;
 - `docs/ARCHITECTURE.md`: topology and protocol;
 - `docs/DEPLOYMENT.md`: production operations;
 - `docs/TROUBLESHOOTING.md`: user-visible failure modes;

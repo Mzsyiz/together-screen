@@ -6,13 +6,13 @@ English | [简体中文](ARCHITECTURE.zh-CN.md)
 
 Together Screen is designed for a small, trusted group:
 
-- fixed rooms of 2 to 6 people;
+- ten fixed rooms, each supporting up to 10 people;
 - one administrator-managed account per participant;
 - multiple simultaneous screen shares;
 - low-bandwidth previews and click-to-upgrade HD streams;
-- peer-to-peer voice;
+- online voice independent from screen quality;
 - persistent text chat;
-- self-hosted deployment with no third-party SaaS dependency.
+- self-hosted deployment with optional Volcengine RTC/WTN transports.
 
 It deliberately does not attempt to be a large meeting platform or an SFU.
 
@@ -23,6 +23,7 @@ React browser client
 ├── room and chat UI
 ├── WebRTC screen peers
 ├── WebRTC voice peers
+├── Volcengine RTC / WTN client
 └── WebSocket signaling client
           │
           ▼
@@ -38,9 +39,9 @@ STUN / coturn
 └── NAT discovery and optional media relay
 ```
 
-## Media topology
+## P2P media topology
 
-The application uses a mesh topology:
+P2P rooms use a mesh topology:
 
 ```text
 A sends screen and voice to B and C
@@ -50,23 +51,25 @@ C sends screen and voice to A and B
 
 For `N` participants, there can be up to `N × (N - 1)` directional media links. The browser performs encoding and decoding locally, so the application server only carries signaling and chat traffic.
 
-This is a cost-effective choice for small rooms. A ten-person room can reach 90 directional links; sender upload, browser encoding load and TURN egress then increase rapidly. WTN is preferable when several people share at once.
+This is a cost-effective choice for small rooms. A ten-person room can reach 90 directional links; sender upload, browser encoding load and TURN egress then increase rapidly. RTC or WTN is preferable when several people share at once.
 
 ## Per-room media modes
 
 Each fixed room stores a persistent `mediaMode`:
 
 - `p2p`: the existing browser mesh with STUN/TURN fallback;
-- `wtn`: Volcengine WebRTC Transmission Network publish/subscribe transport.
+- `wtn`: Volcengine WebRTC Transmission Network publish/subscribe transport;
+- `rtc`: Volcengine Real-Time Communication with independent screen and microphone publishing.
 
 Only an administrator can change the mode, and only while the room is empty. This avoids tearing down active media unexpectedly.
 
-The application provides ten identical rooms with a capacity of 10 participants each. There are no room tiers. An administrator can independently choose P2P/TURN or WTN for every empty room.
+The application provides ten identical rooms with a capacity of 10 participants each. There are no room tiers. An administrator can independently choose P2P/TURN, RTC or WTN for every empty room.
 
 The client exposes standardized usage profiles instead of arbitrary resolution, frame-rate and bitrate combinations:
 
 | Mode | Target | Encoder strategy | Intended content |
 | --- | --- | --- | --- |
+| Lite | 360p / 15 FPS / 0.8 Mbps | Balanced | Lowest bandwidth and constrained networks |
 | Smooth | 720p / 10 FPS / 1.5 Mbps | Balanced | Chat, basic browsing, low bandwidth |
 | Standard | 1080p / 15 FPS / 2.5 Mbps | Resolution first | Default; office, web, documents and code |
 | HD | 1080p / 30 FPS / 4 Mbps | Balanced | Software demos, animation and video |
@@ -74,7 +77,20 @@ The client exposes standardized usage profiles instead of arbitrary resolution, 
 | Gaming | 1080p / 60 FPS / 8 Mbps | Frame rate first | Games and fast movement |
 | 4K | 2160p / 30 FPS / 20 Mbps | Resolution first | 4K source and sufficient upload |
 
-Every room exposes the same six profiles. WebRTC congestion control continues to adapt actual send bitrate.
+Every room exposes the same seven profiles. WebRTC congestion control continues to adapt actual send bitrate.
+
+### Volcengine RTC path
+
+RTC rooms use two browser-side engines:
+
+- The main engine publishes microphone audio and the selected-quality main screen stream. When enabled, shared system audio is attached to the main screen stream.
+- The preview engine uses a separate `<userId>_preview` RTC identity and publishes only a 360p / 15 FPS / 300 Kbps screen video stream with no audio.
+
+Viewers automatically subscribe to the preview identity after joining. Clicking a tile subscribes to the main screen before dropping preview, preserving the latest frame during the switch; leaving focus reverses the process. System audio is subscribed only with the main screen, so preview never plays it.
+
+Microphone audio uses `publishStream(AUDIO)` while the screen uses `publishScreen()`. Changing quality updates only the main screen encoder, without leaving the RTC room or republishing microphone audio. Microphone mute changes only main-stream capture volume and never mute shared system audio.
+
+The Fastify server signs short-lived RTC tokens bound to RoomID and UserID. `RTC_APP_KEY` remains server-side and is never returned to the browser.
 
 ### Volcengine WTN path
 
@@ -109,19 +125,24 @@ The Fastify server:
 2. The browser applies the configured resolution and frame-rate limits.
 3. A low-resolution startup snapshot is captured for protocol compatibility and connection-time fallback.
 4. The client sends `share.started` and the startup snapshot metadata through WebSocket.
-5. The sharer creates one outgoing `RTCPeerConnection` per room member.
-6. Offer, answer and ICE candidates are relayed by the server.
+5. Publishing depends on the transport:
+   - P2P: create one outgoing `RTCPeerConnection` per viewer;
+   - RTC: publish the selected screen from the main engine and a 360p video-only preview from an auxiliary engine;
+   - WTN: publish independent preview, HD and voice StreamIDs.
+6. P2P signaling travels through the application WebSocket; RTC/WTN use the managed transport signaling.
 
 ### Automatic preview, HD and latest-frame fallback
 
-Each outgoing video sender starts in preview mode:
+#### P2P sender preview profile
+
+Each P2P outgoing video sender starts in preview mode:
 
 - maximum bitrate: about 300 Kbps;
 - maximum frame rate: 15 FPS;
 - resolution scaled to approximately 360p;
 - low network priority.
 
-After entering a room, the viewer immediately requests a low-bitrate preview for every sharer and plays it continuously without hover or click. Each viewer also keeps a local latest-frame cache. The cached image covers subscription setup, preview/HD transitions and reconnects, then disappears as soon as a new video frame is available. Clicking requests HD:
+After entering a room, the viewer immediately receives or subscribes to a lightweight preview for every sharer. RTC/WTN use independent preview resources; P2P adjusts sender encoding. Each viewer also keeps a local latest-frame cache for connection, switching and reconnect fallback. Clicking requests HD:
 
 1. Viewer sends `quality.request`.
 2. Server validates room membership and that the target is sharing.
@@ -143,18 +164,25 @@ If parameter application fails, the viewer remains in preview mode and receives 
 
 ## Voice flow
 
-Voice uses the same ICE server configuration as screen sharing but a separate `RTCPeerConnection` for each direction.
+Voice remains independent from screen publishing, with transport-specific implementations:
+
+- P2P: a separate voice `RTCPeerConnection` per direction, reusing the screen ICE configuration;
+- RTC: microphone media uses `publishStream(AUDIO)` on the main engine while screen uses `publishScreen()`;
+- WTN: microphone uses a dedicated voice StreamID.
 
 1. User clicks Join Voice.
 2. Browser requests microphone permission.
-3. Capture is processed through Web Audio for input gain and level metering.
-4. Server broadcasts `voice.updated`.
-5. Each voice-enabled participant creates outgoing voice offers to other voice-enabled participants.
-6. Remote streams are attached to hidden audio elements and analyzed for speaking indicators.
-7. Muting disables the outgoing media tracks without tearing down the peer connections.
-8. Leaving voice closes voice peers and stops all microphone processing tracks.
+3. Capture prefers echo cancellation, noise suppression, gain control, mono and 48 kHz.
+4. The server broadcasts `voice.updated` for membership and mute UI.
+5. P2P creates voice peers; RTC publishes main-stream audio; WTN publishes its voice stream.
+6. Local and remote levels drive speaking indicators; they do not control forwarding.
+7. Mute stops only the sender's microphone audio and does not leave voice chat.
+8. Changing screen quality never republishes RTC/WTN voice.
+9. Leaving voice stops capture and releases the transport-specific voice resources.
 
-Audio constraints request echo cancellation, noise suppression, automatic gain control, mono capture and a 48 kHz ideal sample rate. The sender prefers Opus, applies an approximately 48 Kbps voice bitrate cap after negotiation and marks the track with a speech content hint. If the active microphone disconnects unexpectedly, the client attempts to switch to the system default input instead of dropping the entire voice session. Browser and hardware support still vary.
+The sender prefers Opus, applies an approximately 48 Kbps voice cap and marks the track with a `speech` content hint. If the active microphone disconnects unexpectedly, the client attempts to switch to the system default input. Browser and hardware support still vary.
+
+Shared screen system audio is a separate audio path. It is off by default, travels only with the main HD screen, and is never carried by the RTC/WTN lightweight preview. Microphone mute must not mute screen audio.
 
 ## WebSocket protocol
 
@@ -234,10 +262,10 @@ Use the current architecture when:
 - most pairs can establish direct P2P connections;
 - TURN traffic remains within server egress limits.
 
-Consider introducing an SFU when:
+Prefer RTC/WTN, or introduce a dedicated SFU, when:
 
-- rooms regularly exceed 6 to 10 people;
-- every participant shares high-resolution video;
+- many participants in a ten-person room share simultaneously;
+- multiple viewers require high-resolution streams at the same time;
 - sender upload or browser encoding becomes the bottleneck;
 - TURN egress becomes more expensive than selective forwarding.
 

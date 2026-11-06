@@ -50,6 +50,11 @@ WTN_APP_KEY=
 WTN_BUSINESS_ID=
 WTN_API_BASE_URL=https://wtn.volcvideo.com/webrtc
 WTN_TOKEN_TTL_SECONDS=600
+
+RTC_APP_ID=
+RTC_APP_KEY=
+RTC_BUSINESS_ID=
+RTC_TOKEN_TTL_SECONDS=7200
 ```
 
 生成新的 TURN 密钥：
@@ -72,6 +77,18 @@ WTN 是可选媒体线路。要让管理员界面可以选择 WTN：
 6. 重启应用，在管理中心为没有成员的房间选择 WTN。
 
 房间中已有用户时不能切换媒体模式，应先等待房间清空。
+
+## 2.2 火山引擎 RTC
+
+RTC 是第三条可选媒体线路。要在管理中心启用：
+
+1. 在火山引擎实时音视频控制台创建应用并记录 `AppID`、`AppKey`。
+2. 可选填写业务 ID；服务端会把它应用到浏览器 RTC 引擎。
+3. 把 `RTC_APP_ID`、`RTC_APP_KEY`、`RTC_BUSINESS_ID` 写入仅服务端可读的 `.env`。
+4. `RTC_APP_KEY` 不得进入前端、日志或 Git；浏览器只通过 `/api/rtc/token` 获取短期 Token。
+5. 重启应用，等待房间为空后在管理中心选择“火山引擎 RTC”。
+
+RTC 房间进入后会自动建立预览订阅。共享者发布约 360p 的无系统声音预览和所选清晰度主屏流；观看者点击画面才订阅主屏流。麦克风语音使用独立主流，切换屏幕清晰度不会重新加入房间或重建语音连接。
 
 ## 3. 安装、构建并创建管理员
 
@@ -190,6 +207,30 @@ sudo systemctl reload nginx
 
 如果更新只包含 `dist`，覆盖后重启 Node 项目即可。依赖变化时先运行 `npm ci --omit=dev`。
 
+### 离线服务器更新
+
+服务器不能访问 GitHub 时，上传预先构建好的离线 ZIP：
+
+```bash
+export PATH=/www/server/nodejs/v22.19.0/bin:$PATH
+cd /www/wwwroot/video_to_video
+cp -a .env ".env.bak.$(date +%F-%H%M%S)"
+
+# 先在宝塔中停止 Node 项目，再覆盖源码和 dist
+unzip -o /root/together-screen-offline.zip -d /www/wwwroot/video_to_video
+npm ci --omit=dev
+```
+
+离线包应排除 `.env`、`data/`、`node_modules/`、诊断文件和发布包本身。覆盖后：
+
+1. 保留原 `.env`，并补充新增的 RTC/WTN/TURN 变量；
+2. 在宝塔中重启 Node 项目；
+3. 检查 `/api/health`；
+4. 强制刷新浏览器，避免继续使用旧 hash 的 JS/CSS；
+5. 用两个独立浏览器配置文件测试共享、预览、高清和语音。
+
+数据库结构迁移会在应用启动时自动执行。升级前仍应备份整个 `DATA_DIR`。如果离线包没有包含 `dist/`，必须额外运行 `npm ci && npm run build`。
+
 ## 7. coturn
 
 通过系统包管理器或面板安装 coturn。
@@ -251,6 +292,9 @@ export TURN_URLS="turn:turn.example.com:3478?transport=udp"
 export TURN_SECRET="your-generated-secret"
 export WTN_APP_ID="your-app-id"
 export WTN_APP_KEY="your-app-key"
+export RTC_APP_ID="your-rtc-app-id"
+export RTC_APP_KEY="your-rtc-app-key"
+export RTC_BUSINESS_ID="your-rtc-business-id"
 docker compose up -d --build
 ```
 
@@ -280,6 +324,9 @@ sudo systemctl start together-screen
 - [ ] 已手动创建第一个管理员
 - [ ] `.env` 权限为 `600`
 - [ ] TURN 密钥随机且未进入 Git
+- [ ] 使用 RTC 时 `RTC_APP_ID/KEY` 已配置且 AppKey 未进入前端
+- [ ] 使用 WTN 时 `WTN_APP_ID/KEY` 已配置且 AppKey 未进入前端
+- [ ] 已用两个隔离浏览器验证预览、高清、系统声音和独立语音
 - [ ] `3478/tcp` 和 `3478/udp` 可访问
 - [ ] 中继端口范围可访问
 - [ ] 内部应用端口未公开

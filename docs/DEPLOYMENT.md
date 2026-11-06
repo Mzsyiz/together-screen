@@ -50,6 +50,11 @@ WTN_APP_KEY=
 WTN_BUSINESS_ID=
 WTN_API_BASE_URL=https://wtn.volcvideo.com/webrtc
 WTN_TOKEN_TTL_SECONDS=600
+
+RTC_APP_ID=
+RTC_APP_KEY=
+RTC_BUSINESS_ID=
+RTC_TOKEN_TTL_SECONDS=7200
 ```
 
 Generate a new TURN secret:
@@ -72,6 +77,18 @@ WTN is optional. To make it selectable in the room admin UI:
 6. Restart the application and open Admin Center to select WTN for an empty room.
 
 Rooms already containing users cannot change media mode. Switch the room while it is empty.
+
+## 2.2 Volcengine RTC
+
+RTC is the third optional media transport:
+
+1. Create a Volcengine Real-Time Communication application and record its `AppID` and `AppKey`.
+2. Optionally set a business ID; the server applies it to both browser RTC engines.
+3. Put `RTC_APP_ID`, `RTC_APP_KEY` and `RTC_BUSINESS_ID` in a server-readable `.env`.
+4. Never expose `RTC_APP_KEY` to the client, logs or Git. Browsers obtain only short-lived tokens from `/api/rtc/token`.
+5. Restart the application, wait for the room to become empty, then select “火山引擎 RTC” in Admin Center.
+
+An RTC share publishes a roughly 360p video-only preview and a main screen stream at the selected profile. Viewers subscribe to the preview automatically and to the main screen only after clicking. Microphone voice uses a separate main stream, so changing screen quality never rejoins the room or reconnects voice.
 
 ## 3. Install, build and create the admin
 
@@ -190,6 +207,30 @@ The project can run through the Node project manager:
 
 For updates that only contain `dist`, replace `dist` and restart the Node project. If dependencies changed, run `npm ci --omit=dev` before restarting.
 
+### Offline server updates
+
+When the server cannot reach GitHub, upload a prebuilt offline ZIP:
+
+```bash
+export PATH=/www/server/nodejs/v22.19.0/bin:$PATH
+cd /www/wwwroot/video_to_video
+cp -a .env ".env.bak.$(date +%F-%H%M%S)"
+
+# Stop the Node project in the panel before overwriting files.
+unzip -o /root/together-screen-offline.zip -d /www/wwwroot/video_to_video
+npm ci --omit=dev
+```
+
+The archive should exclude `.env`, `data/`, `node_modules/`, diagnostics and local release bundles. After extraction:
+
+1. Keep the existing `.env` and add any new RTC/WTN/TURN variables.
+2. Restart the Node project in the panel.
+3. Check `/api/health`.
+4. Hard-refresh browsers so they do not keep old hashed JS/CSS assets.
+5. Use two isolated browser profiles to test share, preview, HD and voice.
+
+Database migrations run automatically at startup. Back up the complete `DATA_DIR` before every upgrade. If the archive does not contain `dist/`, run `npm ci && npm run build`.
+
 ## 7. coturn
 
 Install coturn through the OS package manager or your control panel.
@@ -251,6 +292,9 @@ export TURN_URLS="turn:turn.example.com:3478?transport=udp"
 export TURN_SECRET="your-generated-secret"
 export WTN_APP_ID="your-app-id"
 export WTN_APP_KEY="your-app-key"
+export RTC_APP_ID="your-rtc-app-id"
+export RTC_APP_KEY="your-rtc-app-key"
+export RTC_BUSINESS_ID="your-rtc-business-id"
 docker compose up -d --build
 ```
 
@@ -280,6 +324,9 @@ Alternatively use a SQLite-aware backup procedure that includes WAL state.
 - [ ] First admin created manually
 - [ ] `.env` mode is `600`
 - [ ] TURN secret is random and not in Git
+- [ ] RTC AppID/AppKey configured when used, with the AppKey absent from the browser
+- [ ] WTN AppID/AppKey configured when used, with the AppKey absent from the browser
+- [ ] Preview, HD, system audio and independent voice verified with two isolated browsers
 - [ ] `3478/tcp` and `3478/udp` reachable
 - [ ] relay port range reachable
 - [ ] internal application port is not public

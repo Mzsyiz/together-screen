@@ -53,6 +53,8 @@ npm run check
 - 首帧、轻量预览和高清确认；
 - 鼠标离开以及浏览器焦点变化；
 - 多人同时投屏；
+- RTC/WTN 自动预览、点击高清和系统声音开关；
+- 切换清晰度时语音不断开；
 - 语音加入、静音、设备状态和重连；
 - 桌面和窄屏布局。
 
@@ -99,7 +101,7 @@ refactor: simplify voice peer cleanup
 
 - `.env` 文件；
 - TURN 共享密钥或静态凭证；
-- WTN `AppKey` 或可重复使用的 WTN JWT；
+- WTN/RTC `AppKey`、完整 Token 或可重复使用的 JWT；
 - SQLite 数据库；
 - Cookie 和会话令牌；
 - WebRTC 诊断 dump；

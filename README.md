@@ -2,7 +2,7 @@
 
 English | [简体中文](README.zh-CN.md)
 
-Together Screen is a self-hosted WebRTC room for small groups of friends. It combines multi-user screen sharing, peer-to-peer voice chat and persistent text chat in one private room. It is designed for movie nights, watch parties, presentations and lightweight remote collaboration.
+Together Screen is a self-hosted room for small groups of friends. It combines multi-user screen sharing, independent voice chat and persistent text chat in one private room, with self-hosted P2P/TURN, Volcengine RTC and Volcengine WTN media transports.
 
 The project is currently an **MVP / 0.x** application. Desktop Chrome and Edge are the primary supported browsers. Public registration is intentionally disabled; an administrator creates every account.
 
@@ -31,8 +31,7 @@ The project is currently an **MVP / 0.x** application. Desktop Chrome and Edge a
 
 ### Fixed rooms
 
-- One room each for 2, 3, 4, 5 and 6 participants.
-- Administrators can select P2P/TURN or Volcengine WTN independently for each room.
+- Administrators can select P2P/TURN, Volcengine RTC or Volcengine WTN independently for each room.
 - Ten identical rooms are available, each with a capacity of 10 participants and no tier restrictions.
 - An account can be active in only one room at a time.
 - Each user can share one screen at a time.
@@ -41,26 +40,29 @@ The project is currently an **MVP / 0.x** application. Desktop Chrome and Edge a
 ### Screen sharing
 
 - WebRTC peer-to-peer screen sharing; media does not pass through the application server by default.
+- Volcengine RTC rooms publish a 360p video-only preview plus the selected-quality main screen stream.
 - Managed Volcengine WTN publishing and subscriptions when enabled for the room.
 - Default Standard: `1080p / 15 FPS / 2.5 Mbps`.
 - Users select a use case instead of arbitrarily combining resolution and frame rate.
 - Every remote share starts its lightweight live preview automatically after entry, without hover or click.
 - The latest decoded frame is a transition fallback only and never freezes a healthy preview.
-- P2P confirms sender encoding changes; WTN subscribes to an independently published HD stream.
-- Every room can select 720p, 1080p, 2K/1440p and 4K/2160p standard profiles.
+- P2P confirms sender encoding changes; RTC and WTN switch to an independently published main screen stream.
+- RTC viewers subscribe to shared system audio only after focusing the HD stream; preview never carries system audio.
+- Every room can select 360p, 720p, 1080p, 2K/1440p and 4K/2160p standard profiles.
 - WTN republishes the selected standard profile while WebRTC congestion control adapts actual send bitrate.
 - Grid, spotlight, secondary-share strip and fullscreen layouts.
 - Switching tiles or returning from HD keeps the latest frame visible during negotiation, then resumes the lightweight live preview.
-- Screen audio is supported when the operating system and browser expose it.
+- Screen system audio is off by default and must be enabled by the sharer before sharing starts.
 
 ### Rooms
 
-The lobby provides “Room 1” through “Room 10”, each with a fixed capacity of 10 participants. All rooms share the same quality profiles. An administrator may independently choose self-hosted P2P/TURN or Volcengine WTN for each empty room.
+The lobby provides “Room 1” through “Room 10”, each with a fixed capacity of 10 participants. All rooms share the same quality profiles. An administrator may independently choose self-hosted P2P/TURN, Volcengine RTC or Volcengine WTN for each empty room.
 
 ### Voice chat
 
 - P2P microphone audio using the same STUN/TURN configuration as screen sharing.
 - Volcengine WTN microphone transport for rooms configured to use managed media.
+- Volcengine RTC microphone transport on an independent stream; screen quality changes do not reconnect voice.
 - Join, leave, mute and unmute.
 - Microphone device selection and device-change detection.
 - Input gain, input level, output volume and speaking indicators.
@@ -68,6 +70,7 @@ The lobby provides “Room 1” through “Room 10”, each with a fixed capacit
 - Echo cancellation, noise suppression, automatic gain control, mono capture and a 48 kHz ideal sample rate.
 - Opus preference, an approximately 48 Kbps voice cap and elevated real-time network priority.
 - Automatic fallback to the system default microphone if the active input disconnects.
+- Microphone mute affects only the sender's voice, not shared screen audio; room output mute remains independent.
 
 ### Room chat
 
@@ -82,7 +85,7 @@ The lobby provides “Room 1” through “Room 10”, each with a fixed capacit
 | --- | --- |
 | Web client | React 19, TypeScript, Vite |
 | Application server | Node.js 22, Fastify, WebSocket |
-| Realtime media | WebRTC, STUN, coturn, optional Volcengine WTN |
+| Realtime media | WebRTC, STUN, coturn, optional Volcengine RTC / WTN |
 | Persistence | SQLite |
 | Authentication | HttpOnly cookies, scrypt password hashing, expiring TURN credentials |
 | Testing | Vitest, TypeScript, Vite |
@@ -109,9 +112,13 @@ The application server handles accounts, sessions, room state, signaling and cha
 
 In a WTN room, each participant publishes separate screen-preview, screen-HD and voice streams to Volcengine, and viewers create subscriptions on demand. The dual-stream design does not depend on WTN simulcast RIDs and adds roughly 300 Kbps to a screen sharer's upload. The application server remains the control plane and issues short-lived WTN JWTs without exposing `WTN_APP_KEY` to the browser.
 
-A mesh room can have up to `N × (N - 1)` directional media links. A ten-person room can therefore reach 90 directional links, and each sharer may need to encode several outgoing streams. WTN is recommended when many participants share simultaneously; P2P/TURN is better for a smaller number of active sharers.
+In a RTC room, microphone voice is published independently from screen media. A sharer publishes a 360p video-only preview identity and a main screen identity at the selected profile. Viewers subscribe to the preview automatically, then subscribe to the main screen and shared system audio only after clicking the tile. The server issues short-lived room tokens and never sends `RTC_APP_KEY` to the browser.
+
+Only P2P rooms use a mesh of up to `N × (N - 1)` directional media links. A ten-person room can therefore reach 90 directional links, and each sharer may need to encode several outgoing streams. RTC or WTN is recommended when many participants share simultaneously; P2P/TURN is better for a smaller number of active sharers.
 
 See [Architecture](docs/ARCHITECTURE.md) for signaling, quality negotiation, voice lifecycle and scalability details.
+
+See [Media transport guide](docs/MEDIA_TRANSPORTS.md) for cost, deployment and room-mode selection guidance.
 
 See [Screen-sharing parameter reference](docs/SCREEN_SHARING_BENCHMARK.md) for publicly documented parameters from mainstream collaboration products.
 
@@ -165,13 +172,14 @@ npm run user:list
 
 1. The administrator creates accounts and shares credentials with friends.
 2. Each participant signs in with their own account.
-3. The administrator selects P2P/TURN or Volcengine WTN for each empty room in “Admin Center”.
-4. Everyone enters the same capacity-matched room.
-5. Click “Share Screen” and select a window, tab or display.
-6. Other participants see the lightweight live preview automatically; click the tile for HD.
-7. Click “Join Voice” and allow microphone access.
-8. Open “Voice Settings” to select a microphone, adjust gain, change output volume or inspect connection state.
-9. Use the right sidebar for text and Emoji chat.
+3. The administrator selects P2P/TURN, Volcengine RTC or Volcengine WTN for each empty room in “Admin Center”.
+4. Everyone enters the agreed room.
+5. To share media audio, open “Share Settings” and explicitly enable shared system audio before sharing.
+6. Click “Share Screen” and select a window, tab or display.
+7. Other participants see the lightweight live preview automatically; click the tile for HD.
+8. Click “Join Voice” and allow microphone access.
+9. Open “Voice Settings” to select a microphone, adjust gain, change output volume or inspect connection state.
+10. Use the right sidebar for text and Emoji chat.
 
 Only one browser client can be active for an account. Signing in from a new browser or tab invalidates the previous active page.
 
@@ -179,18 +187,19 @@ Only one browser client can be active for an account. Signing in from a new brow
 
 | State | Defaults | Behavior |
 | --- | --- | --- |
-| Preview | About 300 Kbps, 15 FPS, about 360p | Starts automatically and resumes after leaving HD |
+| Preview | RTC/WTN: about 300 Kbps, 15 FPS, 360p; P2P: low-priority small layer | Starts automatically and resumes after leaving HD |
 | Latest frame | Last decoded frame | Used only during connect, switch or reconnect fallback |
+| Lite | 360p, 15 FPS, 0.8 Mbps | Lowest-bandwidth viewing |
 | Smooth | 720p, 10 FPS, 1.5 Mbps | Chat, basic browsing and constrained networks |
 | Standard | 1080p, 15 FPS, 2.5 Mbps | Default: office, web, documents and code |
 | HD | 1080p, 30 FPS, 4 Mbps | Software demos, animation and video |
 | Ultra | 2K/1440p, 30 FPS, 8 Mbps | High-resolution desktops and detailed content |
 | Gaming | 1080p, 60 FPS, 8 Mbps | Games and motion; frame rate first |
-| 4K | 4K/2160p, 30 FPS, 20 Mbps | Ultimate rooms only; requires a 4K source |
+| 4K | 4K/2160p, 30 FPS, 20 Mbps | Requires a 4K source, browser encoding support and sufficient upload |
 
 Bitrate values are caps. WebRTC congestion control still adapts actual bitrate from packet loss, RTT and available bandwidth. Normal rooms clamp higher modes to their allowed resolution and bitrate instead of producing invalid combinations.
 
-With WTN, 4K still depends on a 4K capture source, browser encoding support and viewer decoding capability. In P2P rooms, 2K/4K significantly increases sharer upload; reserve the highest modes for the content that needs them.
+With RTC/WTN, 4K still depends on a 4K capture source, browser encoding support and viewer decoding capability. In P2P rooms, 2K/4K significantly increases sharer upload; reserve the highest modes for the content that needs them.
 
 ## Configuration
 
@@ -218,6 +227,10 @@ cp .env.example .env
 | `WTN_BUSINESS_ID` | Empty | Optional WTN business ID |
 | `WTN_API_BASE_URL` | Volcengine endpoint | WTN WHIP/WHEP API base |
 | `WTN_TOKEN_TTL_SECONDS` | `600` | Lifetime of generated WTN JWTs |
+| `RTC_APP_ID` | Empty | Volcengine RTC application ID |
+| `RTC_APP_KEY` | Empty | Server-only RTC token signing key |
+| `RTC_BUSINESS_ID` | Empty | Optional RTC business ID |
+| `RTC_TOKEN_TTL_SECONDS` | `7200` | Lifetime of generated RTC room tokens |
 
 When a shared secret is configured, the server generates expiring per-user TURN credentials. Keep the real secret in a protected environment file only.
 
@@ -243,6 +256,7 @@ Production requirements:
 5. WebSocket Upgrade support in the reverse proxy.
 6. Reachable TURN for restrictive networks.
 7. Volcengine `WTN_APP_ID` and `WTN_APP_KEY` if any room uses WTN.
+8. Volcengine `RTC_APP_ID` and `RTC_APP_KEY` if any room uses RTC.
 
 See [Deployment](docs/DEPLOYMENT.md) for Nginx, systemd, coturn, Docker and Baota/aaPanel instructions.
 
@@ -253,6 +267,9 @@ export APP_ORIGIN=http://localhost:3000
 export COOKIE_SECURE=false
 export WTN_APP_ID=""
 export WTN_APP_KEY=""
+export RTC_APP_ID=""
+export RTC_APP_KEY=""
+export RTC_BUSINESS_ID=""
 docker compose up -d --build
 ```
 
@@ -283,7 +300,7 @@ Stop the service before copying the directory, or use a SQLite-aware backup that
 
 - Use a strong unique administrator password.
 - Never commit `.env`, SQLite files, WebRTC dumps, real IP addresses or TURN secrets.
-- Never expose or commit `WTN_APP_KEY`; browsers receive only short-lived JWTs.
+- Never expose or commit `WTN_APP_KEY` or `RTC_APP_KEY`; browsers receive only short-lived tokens.
 - Rotate a TURN secret immediately if it entered a public repository or diagnostic file.
 - Redact accounts, IPs and network metadata before posting WebRTC diagnostics.
 - Report vulnerabilities privately according to [SECURITY.md](SECURITY.md).
@@ -312,9 +329,10 @@ docs/             Architecture, deployment and troubleshooting
 - Designed for ten fixed rooms of up to ten people; simultaneous P2P HD sharing has significant client and upload costs.
 - Mobile browsers are suitable for viewing and chat, not primary screen sharing.
 - Safari and Firefox differ in screen and system-audio support.
+- Shared system audio is selected before screen capture starts; changing it while sharing requires stopping and restarting the share.
 - No file/image transfer, message recall, audit log, user deletion UI or online-kick UI yet.
 - P2P and TURN quality depends on participant networks, carrier routing and server egress.
-- WTN rooms require a Volcengine account, AppID/AppKey and accepted WTN billing terms.
+- RTC/WTN rooms require a Volcengine account, the matching AppID/AppKey and accepted billing terms.
 
 See [Troubleshooting](docs/TROUBLESHOOTING.md) for common failures.
 

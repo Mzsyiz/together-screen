@@ -53,7 +53,7 @@ rsync -a \
 ```bash
 cd ../together-screen-public
 find . -maxdepth 3 -type f | sort
-rg -n -S "(BEGIN PRIVATE KEY|static-auth-secret=|TURN_SECRET=.+|WTN_APP_KEY=.+|password=.+|api[_-]?key)" .
+rg -n -S "(BEGIN PRIVATE KEY|static-auth-secret=|TURN_SECRET=.+|WTN_APP_KEY=.+|RTC_APP_KEY=.+|password=.+|api[_-]?key)" .
 ```
 
 初始化新仓库：
@@ -86,7 +86,7 @@ git filter-repo \
 建议描述：
 
 ```text
-Self-hosted WebRTC screen-sharing rooms with P2P voice and text chat for 2–6 friends.
+Self-hosted 10-person screen-sharing rooms with independent voice, text chat, P2P/TURN, Volcengine RTC and WTN.
 ```
 
 建议 Topics：
@@ -101,6 +101,8 @@ typescript
 fastify
 sqlite
 video-conferencing
+volcengine
+webrtc-rtc
 ```
 
 建议开启：
