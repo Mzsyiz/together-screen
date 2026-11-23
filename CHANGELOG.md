@@ -47,6 +47,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - Runtime diagnostics, private deployment notes and release archives are ignored by Git and Docker.
 - Removed private diagnostic and local-note files from the current Git index while preserving local copies.
 
+## [0.1.1] - 2026-11-23
+
+### Changed
+
+- Made the Docker host binding and host port configurable for both local and reverse-proxy deployments.
+- Promoted the current WTN, RTC and seven-profile release to version `0.1.1`.
+
 ## [0.1.0] - 2026-11-05
 
 ### Added

@@ -1,6 +1,6 @@
 {
   "name": "together-screen",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Self-hosted WebRTC screen-sharing rooms with voice chat for small groups.",
   "license": "MIT",
